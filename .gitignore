@@ -1,0 +1,221 @@
+# ============================================
+# 📦 NODE.JS - DEPENDENCIAS
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+.npm
+.eslintcache
+.yarn-integrity
+
+# ============================================
+# 🔐 VARIABLES DE ENTORNO (MUY IMPORTANTE)
+# ============================================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+.env.test
+config/local.json
+config/secrets.json
+*.env
+*.env.*
+
+# ============================================
+# 📝 LOGS
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/*
+!logs/.gitkeep
+*.out
+*.err
+
+# ============================================
+# 🗄️ BASE DE DATOS LOCAL
+# ============================================
+*.sql
+*.sql.gz
+*.sql.bz2
+*.db
+*.sqlite
+*.sqlite3
+database/*.sql
+database/*.dump
+database/*.bak
+data/
+db/
+backup/
+backups/
+*.dump
+*.backup
+
+# ============================================
+# 📁 ARCHIVOS TEMPORALES Y DE CACHE
+# ============================================
+tmp/
+temp/
+.cache/
+.npm/
+.eslintcache
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ============================================
+# 💻 IDEs Y EDITORES
+# ============================================
+# IntelliJ / WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+.history/
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swn
+*.swo
+
+# ============================================
+# 🔑 CERTIFICADOS Y CLAVES
+# ============================================
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+credentials/
+
+# ============================================
+# 📦 ARCHIVOS DE COMPILACIÓN
+# ============================================
+dist/
+build/
+out/
+target/
+*.o
+*.obj
+*.pyc
+__pycache__/
+
+# ============================================
+# 🧪 TESTING
+# ============================================
+coverage/
+.nyc_output/
+test-results/
+*.lcov
+.jest/
+
+# ============================================
+# 🖥️ ARCHIVOS DE SISTEMA
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ============================================
+# 📸 SCREENSHOTS Y CAPTURAS
+# ============================================
+screenshots/
+captures/
+captures/*
+!captures/.gitkeep
+
+# ============================================
+# 📦 UPLOADS Y ARCHIVOS DE USUARIO
+# ============================================
+uploads/
+uploads/*
+!uploads/.gitkeep
+public/uploads/
+public/uploads/*
+!public/uploads/.gitkeep
+files/
+files/*
+!files/.gitkeep
+
+# ============================================
+# 🗂️ ARCHIVOS ESPECÍFICOS DEL PROYECTO
+# ============================================
+# Si tienes carpetas específicas que no quieres subir
+temp_files/
+temp_data/
+debug/
+debug.log
+
+# ============================================
+# 🐳 DOCKER (OPCIONAL - Si usas Docker)
+# ============================================
+# Descomenta si NO quieres subir archivos de Docker
+# docker-compose.override.yml
+# .docker/
+
+# ============================================
+# 🔒 ARCHIVOS SENSIBLES ADICIONALES
+# ============================================
+*.key.pem
+*.cert.pem
+serviceAccountKey.json
+firebase-service-account.json
+google-credentials.json
+aws-credentials
+.azure/credentials
+
+# ============================================
+# 📊 REPORTES Y ANÁLISIS
+# ============================================
+reports/
+analytics/
+metrics/
+
+# ============================================
+# 🗑️ OTROS
+# ============================================
+*.bak
+*.backup
+*.old
+*.orig
+*.orig.*
+*.rej
+*.patch

@@ -1,0 +1,418 @@
+// routes/enfermeria-panel.js
+const express = require('express');
+const router = express.Router();
+const { getConnection } = require('../conexion');
+const { verificarToken, verificarRol } = require('../middleware/auth');
+
+console.log('✅ [ROUTER] Cargando enfermeria-panel.js');
+
+// Middleware: solo enfermeras, nutricionistas y admin
+router.use(verificarToken);
+router.use(verificarRol('enfermera', 'nutricionista', 'admin'));
+
+// ============================================================================
+// 📊 GET /nutricionapp-api/enfermeria/estadisticas
+// 👉 Estadísticas del dashboard de enfermería
+// ============================================================================
+router.get('/estadisticas', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+
+    console.log('📊 [ESTADÍSTICAS] Calculando para usuario:', usuarioId);
+
+    // 1️⃣ TOTAL DE PACIENTES ASIGNADOS (registros creados por este usuario)
+    const [totalPacientes] = await connection.execute(
+      `SELECT COUNT(DISTINCT p.id) as total 
+       FROM pacientes p
+       INNER JOIN registro r ON r.paciente_id = p.id 
+       WHERE r.registrado_por = ? 
+         AND p.eliminado_en IS NULL 
+         AND r.estado != 'cancelado'`,
+      [usuarioId]
+    );
+
+    // 2️⃣ REGISTROS DE HOY (del día actual, creados por este usuario)
+    const [registrosHoy] = await connection.execute(
+      `SELECT COUNT(*) as total
+       FROM registro 
+       WHERE registrado_por = ? 
+         AND DATE(creado_en) = CURRENT_DATE 
+         AND estado != 'cancelado'`,
+      [usuarioId]
+    );
+
+    // 3️⃣ REGISTROS TOTALES DEL MES ACTUAL (creados por este usuario)
+    const [registrosMes] = await connection.execute(
+      `SELECT COUNT(*) as total
+       FROM registro 
+       WHERE registrado_por = ? 
+         AND MONTH(creado_en) = MONTH(CURDATE())
+         AND YEAR(creado_en) = YEAR(CURDATE())
+         AND estado != 'cancelado'`,
+      [usuarioId]
+    );
+
+    // 4️⃣ REGISTROS PENDIENTES (para mostrar en panel)
+    const [pendientes] = await connection.execute(
+      `SELECT COUNT(*) as pendientes 
+       FROM registro 
+       WHERE registrado_por = ? 
+         AND estado NOT IN ('finalizado', 'cancelado')`,
+      [usuarioId]
+    );
+
+    // 5️⃣ ALERTAS ACTIVAS (presión arterial alta o glucosa alta del último registro)
+    // ⚠️ NOTA: Las alertas son GLOBALES (no filtradas por usuario)
+    const [detalleAlertas] = await connection.execute(
+      `SELECT 
+        r.paciente_id,
+        p.nombres,
+        p.apellidos,
+        p.numero_identificacion as cedula,
+        r.signos_vitales,
+        r.fecha_inicio as fecha_registro
+       FROM registro r
+       INNER JOIN pacientes p ON p.id = r.paciente_id
+       INNER JOIN (
+         SELECT paciente_id, MAX(fecha_inicio) as ultima_fecha
+         FROM registro
+         WHERE estado IN ('finalizado', 'signos_vitales', 'antropometricos', 'metabolicas')
+         GROUP BY paciente_id
+       ) ultimo ON r.paciente_id = ultimo.paciente_id 
+                 AND r.fecha_inicio = ultimo.ultima_fecha
+       WHERE r.signos_vitales IS NOT NULL
+       ORDER BY r.fecha_inicio DESC
+       LIMIT 10`
+    );
+
+    // Procesar alertas para identificar cuáles son críticas
+    const alertasActivas = [];
+    for (const alerta of detalleAlertas) {
+      try {
+        const signos = typeof alerta.signos_vitales === 'string' 
+          ? JSON.parse(alerta.signos_vitales) 
+          : alerta.signos_vitales;
+        
+        let tipoAlerta = [];
+        let nivel = 'medio';
+        
+        // Verificar presión arterial
+        if (signos?.presionArterial) {
+          const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
+          if (sist >= 180 || dia >= 120) {
+            tipoAlerta.push(`PA: ${signos.presionArterial} (CRÍTICA)`);
+            nivel = 'critico';
+          } else if (sist >= 140 || dia >= 90) {
+            tipoAlerta.push(`PA: ${signos.presionArterial}`);
+            if (nivel !== 'critico') nivel = 'alto';
+          }
+        }
+        
+        // Verificar glucosa
+        if (signos?.glucosaAyunas) {
+          if (signos.glucosaAyunas >= 200) {
+            tipoAlerta.push(`Glucosa: ${signos.glucosaAyunas} mg/dL (CRÍTICA)`);
+            nivel = 'critico';
+          } else if (signos.glucosaAyunas >= 126) {
+            tipoAlerta.push(`Glucosa: ${signos.glucosaAyunas} mg/dL`);
+            if (nivel !== 'critico') nivel = 'alto';
+          }
+        }
+        
+        // Verificar SpO2
+        if (signos?.spo2 && signos.spo2 < 90) {
+          tipoAlerta.push(`SpO2: ${signos.spo2}% (CRÍTICA)`);
+          nivel = 'critico';
+        }
+        
+        if (tipoAlerta.length > 0) {
+          alertasActivas.push({
+            paciente_id: alerta.paciente_id,
+            nombre_completo: `${alerta.nombres} ${alerta.apellidos}`,
+            cedula: alerta.cedula,
+            tipo_alerta: tipoAlerta.join(' | '),
+            nivel: nivel,
+            fecha: alerta.fecha_registro
+          });
+        }
+      } catch (e) {
+        console.warn('⚠️ Error procesando alerta:', e.message);
+      }
+    }
+
+    // 📝 LOGS DE DEBUG
+    console.log('📊 [ESTADÍSTICAS] Resultados:', {
+      total_pacientes: totalPacientes[0]?.total || 0,
+      registros_hoy: registrosHoy[0]?.total || 0,
+      registros_mes: registrosMes[0]?.total || 0,
+      pendientes: pendientes[0]?.pendientes || 0,
+      alertas_activas: alertasActivas.length
+    });
+
+    return res.status(200).json({
+      error: false,
+      datos: {
+        total_pacientes: totalPacientes[0]?.total || 0,
+        citas_hoy: registrosHoy[0]?.total || 0,
+        registros_mes: registrosMes[0]?.total || 0,
+        registros_pendientes: pendientes[0]?.pendientes || 0,
+        alertas_activas: alertasActivas.length,
+        detalle_alertas: alertasActivas
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ [ESTADÍSTICAS] Error:', {
+      message: err.message,
+      code: err.code,
+      sql: err.sql
+    });
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al cargar estadísticas: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+// 👥 GET /nutricionapp-api/enfermeria/pacientes/recientes
+// ✅ CORREGIDO: Prioriza registro FINALIZADO y considera plan del médico
+// ============================================================================
+router.get('/pacientes/recientes', async (req, res) => {
+  const { limit = 6 } = req.query;
+  const usuarioId = req.usuario?.id;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+
+    console.log('👥 [PACIENTES] Cargando recientes para usuario:', usuarioId);
+
+    const [pacientes] = await connection.execute(
+      `SELECT 
+         p.id, 
+         CONCAT(p.nombres, ' ', p.apellidos) as nombre_completo,
+         p.numero_identificacion as cedula,
+         p.telefono,
+         r.id as registro_id,
+         r.estado as estado_registro,
+         r.creado_en as registro_creado_en,
+         r.fecha_finalizacion,
+         r.datos_personales,
+         r.signos_vitales,
+         r.datos_antropometricos,
+         r.condiciones_metabolicas,
+         -- Subquery: ¿Existe plan nutricional activo?
+         (SELECT COUNT(*) FROM planes_nutricionales pn 
+          WHERE pn.paciente_id = p.id AND pn.estado = 'activo') as planes_activos,
+         -- Subquery: ¿Existe plan con detalle completo?
+         (SELECT COUNT(*) FROM planes_nutricionales pn 
+          WHERE pn.paciente_id = p.id 
+            AND pn.estado = 'activo' 
+            AND pn.plan_detallado IS NOT NULL) as planes_completos
+       FROM pacientes p
+       INNER JOIN (
+         SELECT 
+           paciente_id,
+           id,
+           estado,
+           creado_en,
+           fecha_finalizacion,
+           datos_personales,
+           signos_vitales,
+           datos_antropometricos,
+           condiciones_metabolicas,
+           ROW_NUMBER() OVER (
+             PARTITION BY paciente_id 
+             ORDER BY 
+               CASE estado 
+                 WHEN 'finalizado' THEN 1 
+                 WHEN 'metabolicas' THEN 2 
+                 WHEN 'antropometricos' THEN 3 
+                 WHEN 'signos_vitales' THEN 4 
+                 WHEN 'datos_personales' THEN 5 
+                 ELSE 6 
+               END,
+               creado_en DESC
+           ) as rn
+         FROM registro
+         WHERE registrado_por = ? AND estado != 'cancelado'
+       ) r ON r.paciente_id = p.id AND r.rn = 1
+       WHERE p.eliminado_en IS NULL
+       ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC
+       LIMIT ?`,
+      [usuarioId, parseInt(limit)]
+    );
+
+    // ✅ Procesar cada paciente con cálculo de progreso CORREGIDO
+    const pacientesProcesados = pacientes.map(p => {
+      let progreso = 0;
+      let estado_real = 'iniciado';
+
+      // ============================================
+      // ✅ CÁLCULO DE PROGRESO CORREGIDO
+      // ============================================
+      
+      // Si el registro está FINALIZADO → 100% (enfermería completó su parte)
+      if (p.estado_registro === 'finalizado') {
+        progreso = 100;
+        estado_real = 'finalizado';
+      } else {
+        // Contar campos llenos para progreso parcial
+        let camposLlenos = 0;
+        if (p.datos_personales) camposLlenos++;
+        if (p.signos_vitales) camposLlenos++;
+        if (p.datos_antropometricos) camposLlenos++;
+        if (p.condiciones_metabolicas) camposLlenos++;
+        
+        // Progreso proporcional (4 campos = 100%)
+        progreso = Math.round((camposLlenos / 4) * 100);
+        estado_real = 'en_proceso';
+      }
+
+      // ============================================
+      // DETECTAR ALERTAS EN SIGNOS VITALES
+      // ============================================
+      const alertas = [];
+      let tiene_alerta = false;
+      
+      if (p.signos_vitales) {
+        try {
+          const signos = typeof p.signos_vitales === 'string' 
+            ? JSON.parse(p.signos_vitales) 
+            : p.signos_vitales;
+          
+          if (signos?.presionArterial) {
+            const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
+            if (sist >= 180 || dia >= 120) {
+              alertas.push({ tipo: 'PA Crítica', nivel: 'critico' });
+              tiene_alerta = true;
+            } else if (sist >= 140 || dia >= 90) {
+              alertas.push({ tipo: 'PA Alta', nivel: 'alto' });
+              tiene_alerta = true;
+            }
+          }
+          
+          if (signos?.glucosaAyunas) {
+            if (signos.glucosaAyunas >= 200) {
+              alertas.push({ tipo: 'Glucosa Crítica', nivel: 'critico' });
+              tiene_alerta = true;
+            } else if (signos.glucosaAyunas >= 126) {
+              alertas.push({ tipo: 'Glucosa Alta', nivel: 'alto' });
+              tiene_alerta = true;
+            }
+          }
+          
+          if (signos?.spo2 && signos.spo2 < 90) {
+            alertas.push({ tipo: 'SpO2 Baja', nivel: 'critico' });
+            tiene_alerta = true;
+          }
+        } catch (e) {
+          console.warn('⚠️ Error procesando signos:', e.message);
+        }
+      }
+
+      // Determinar fecha para mostrar
+      const ultima_fecha = p.fecha_finalizacion || p.registro_creado_en;
+
+      console.log(`📊 [PROGRESO] ${p.nombre_completo}: ${progreso}% (${estado_real}) | Registro: ${p.estado_registro}`);
+
+      return {
+        id: p.id,
+        nombre_completo: p.nombre_completo,
+        cedula: p.cedula,
+        telefono: p.telefono,
+        registro_id: p.registro_id,
+        estado_real: estado_real,
+        progreso: progreso,
+        alertas: alertas,
+        tiene_alerta: tiene_alerta,
+        ultima_fecha: ultima_fecha,
+        // Información adicional para el frontend
+        tiene_plan: p.planes_activos > 0,
+        tiene_plan_completo: p.planes_completos > 0
+      };
+    });
+
+    console.log('👥 [PACIENTES] Encontrados:', pacientesProcesados.length);
+
+    return res.status(200).json({
+      error: false,
+      pacientes: pacientesProcesados
+    });
+
+  } catch (err) {
+    console.error('❌ [PACIENTES] Error:', err.message);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al cargar pacientes: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+// ============================================================================
+// 🔍 GET /nutricionapp-api/enfermeria/pacientes/buscar/:cedula
+// ============================================================================
+router.get('/pacientes/buscar/:cedula', async (req, res) => {
+  const { cedula } = req.params;
+  let connection;
+  
+  try {
+    connection = await getConnection();
+    
+    const [resultados] = await connection.execute(
+      `SELECT p.id, p.nombres, p.apellidos, 
+              CONCAT(p.nombres, ' ', p.apellidos) as nombre_completo,
+              p.numero_identificacion as cedula, 
+              r.id as registro_id, 
+              r.estado as registro_estado
+       FROM pacientes p
+       LEFT JOIN registro r ON r.paciente_id = p.id 
+         AND r.estado NOT IN ('finalizado', 'cancelado')
+       WHERE p.numero_identificacion = ? 
+         AND p.activo = 1 
+         AND p.eliminado_en IS NULL
+       LIMIT 1`,
+      [cedula]
+    );
+
+    if (resultados.length === 0) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
+
+    const paciente = resultados[0];
+    
+    return res.json({
+      error: false,
+      paciente: {
+        id: paciente.id,
+        nombre_completo: paciente.nombre_completo,
+        cedula: paciente.cedula,
+        registro_pendiente: paciente.registro_id ? { 
+          id: paciente.registro_id, 
+          estado: paciente.registro_estado 
+        } : null
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error búsqueda:', err);
+    return res.status(500).json({ error: true, mensaje: 'Error al buscar paciente' });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+console.log('✅ [ROUTER] enfermeria-panel.js cargado correctamente');
+module.exports = router;

@@ -1,0 +1,365 @@
+// routes/medico-plan-nutricional.js
+const express = require('express');
+const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
+const { getConnection } = require('../conexion');
+const { verificarToken, verificarRol } = require('../middleware/auth');
+
+console.log('✅ [ROUTER] Cargando medico-plan-nutricional.js');
+
+// ============================================================================
+// ⚠️ IMPORTANTE: Las rutas ESPECÍFICAS van PRIMERO
+// ⚠️ Las rutas con parámetros (/:id) van DESPUÉS
+// ============================================================================
+
+// ============================================================================
+// 📋 LISTAR PLANES NUTRICIONALES DEL MÉDICO (RUTA ESPECÍFICA - VA PRIMERO)
+// GET /nutricionapp-api/medico/plan-nutricional/planes
+// ============================================================================
+router.get('/planes', verificarToken, verificarRol('doctor', 'nutricionista'), async (req, res) => {
+    const medicoId = req.usuario?.id;
+    
+    if (!medicoId) {
+        return res.status(401).json({ error: true, mensaje: 'No autenticado' });
+    }
+
+    let connection;
+    try {
+        connection = await getConnection();
+
+        const [planes] = await connection.execute(
+            `SELECT 
+                pn.id,
+                pn.registro_id,
+                pn.paciente_id,
+                pn.medico_id,
+                pn.perfil_recomendado,
+                pn.perfil_recomendado_id,
+                pn.confianza_ia,
+                pn.duracion_semanas,
+                pn.estado,
+                pn.fecha_creacion,
+                pn.fecha_actualizacion,
+                pn.fecha_vigencia_desde,
+                pn.fecha_vigencia_hasta,
+                p.nombres AS paciente_nombres,
+                p.apellidos AS paciente_apellidos,
+                p.numero_identificacion AS paciente_identificacion
+             FROM planes_nutricionales pn
+             INNER JOIN pacientes p ON pn.paciente_id = p.id
+             WHERE pn.medico_id = ?
+               AND p.eliminado_en IS NULL
+             ORDER BY pn.fecha_creacion DESC`,
+            [medicoId]
+        );
+
+        console.log(`✅ [PLANES] ${planes.length} planes encontrados para médico ${medicoId}`);
+
+        return res.status(200).json({
+            error: false,
+            total: planes.length,
+            planes: planes
+        });
+
+    } catch (err) {
+        console.error('❌ [PLANES] Error listando planes:', err);
+        return res.status(500).json({ 
+            error: true, 
+            mensaje: 'Error al listar planes nutricionales' 
+        });
+    } finally {
+        if (connection) {
+            try { connection.release(); } catch (e) {}
+        }
+    }
+});
+
+// ============================================================================
+// 📋 LISTAR PLANES DE UN PACIENTE ESPECÍFICO
+// GET /nutricionapp-api/medico/plan-nutricional/paciente/:paciente_id
+// ============================================================================
+router.get('/paciente/:paciente_id', verificarToken, verificarRol('doctor', 'nutricionista', 'paciente'), async (req, res) => {
+  const { paciente_id } = req.params;
+  const usuario_id = req.usuario?.id;
+  const usuario_rol = req.usuario?.rol;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    const whereClause = usuario_rol === 'paciente' 
+      ? 'pn.paciente_id = ? AND pn.medico_id = ?' 
+      : 'pn.paciente_id = ?';
+    const params = usuario_rol === 'paciente' ? [paciente_id, usuario_id] : [paciente_id];
+
+    const [planes] = await connection.execute(
+      `SELECT 
+        pn.id, pn.perfil_recomendado, pn.estado, pn.fecha_creacion,
+        pn.fecha_vigencia_desde, pn.fecha_vigencia_hasta,
+        pn.confianza_ia, pn.recomendaciones,
+        JSON_UNQUOTE(JSON_EXTRACT(pn.plan_detallado, '$.weekly.start_date')) as start_date,
+        JSON_UNQUOTE(JSON_EXTRACT(pn.plan_detallado, '$.weekly.end_date')) as end_date,
+        CONCAT(p.nombres, ' ', p.apellidos) as paciente_nombre
+       FROM planes_nutricionales pn
+       JOIN pacientes p ON p.id = pn.paciente_id
+       WHERE ${whereClause}
+       ORDER BY pn.fecha_creacion DESC`,
+      params
+    );
+
+    return res.json({ error: false, total: planes.length, planes });
+
+  } catch (err) {
+    console.error('❌ [PLAN] Error listando planes:', err.message);
+    return res.status(500).json({ error: true, mensaje: 'Error al listar planes' });
+  } finally {
+    if (connection) { try { connection.release(); } catch (e) {} }
+  }
+});
+
+// ============================================================================
+// 🔍 OBTENER UN PLAN POR ID (RUTA CON PARÁMETRO - VA DESPUÉS)
+// GET /nutricionapp-api/medico/plan-nutricional/:plan_id
+// ============================================================================
+router.get('/:plan_id', verificarToken, verificarRol('doctor', 'nutricionista', 'paciente'), async (req, res) => {
+  const { plan_id } = req.params;
+  const usuario_id = req.usuario?.id;
+  const usuario_rol = req.usuario?.rol;
+
+  if (!plan_id) {
+    return res.status(400).json({ error: true, mensaje: 'plan_id es requerido' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    const [plan] = await connection.execute(
+      `SELECT 
+        pn.*,
+        p.nombres as paciente_nombre,
+        p.apellidos as paciente_apellido,
+        CONCAT(p.nombres, ' ', p.apellidos) as paciente_nombre_completo,
+        u.nombre as medico_nombre,
+        u.apellido as medico_apellido,
+        CONCAT(u.nombre, ' ', u.apellido) as medico_nombre_completo
+       FROM planes_nutricionales pn
+       JOIN pacientes p ON p.id = pn.paciente_id
+       JOIN usuarios u ON u.id = pn.medico_id
+       WHERE pn.id = ?`,
+      [plan_id]
+    );
+
+    if (!plan.length) {
+      return res.status(404).json({ error: true, mensaje: 'Plan no encontrado' });
+    }
+
+    const planData = plan[0];
+
+    if (usuario_rol === 'paciente' && planData.paciente_id !== usuario_id) {
+      return res.status(403).json({ error: true, mensaje: 'No tienes permiso para ver este plan' });
+    }
+
+    const planParseado = {
+      ...planData,
+      respuesta_ia_completa: planData.respuesta_ia_completa ? JSON.parse(planData.respuesta_ia_completa) : null,
+      datos_clinicos_base: planData.datos_clinicos_base ? JSON.parse(planData.datos_clinicos_base) : null,
+      objetivos: planData.objetivos ? JSON.parse(planData.objetivos) : [],
+      alergias: planData.alergias ? JSON.parse(planData.alergias) : [],
+      preferencias: planData.preferencias ? JSON.parse(planData.preferencias) : null,
+      plan_detallado: planData.plan_detallado ? JSON.parse(planData.plan_detallado) : null
+    };
+
+    return res.json({ error: false, plan: planParseado });
+
+  } catch (err) {
+    console.error('❌ [PLAN] Error obteniendo plan:', err.message);
+    return res.status(500).json({ error: true, mensaje: 'Error al cargar el plan: ' + err.message });
+  } finally {
+    if (connection) { try { connection.release(); } catch (e) {} }
+  }
+});
+
+// ============================================================================
+// ➕ CREAR NUEVO PLAN
+// POST /nutricionapp-api/medico/plan-nutricional
+// ============================================================================
+router.post('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (req, res) => {
+  const usuario_id = req.usuario?.id;
+  
+  if (!usuario_id) {
+    return res.status(401).json({ error: true, mensaje: 'No autorizado' });
+  }
+
+  const {
+    paciente_id,
+    medico_id,
+    perfil_recomendado,
+    perfil_recomendado_id,
+    confianza_ia,
+    respuesta_ia_completa,
+    datos_clinicos_base,
+    objetivos,
+    recomendaciones,
+    duracion_semanas,
+    notas_adicionales,
+    alergias,
+    preferencias,
+    plan_detallado,
+    fecha_creacion,
+    estado,
+    validado_por_ia
+  } = req.body;
+
+  if (!paciente_id) {
+    return res.status(400).json({ error: true, mensaje: 'paciente_id es requerido' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+    
+    const [paciente] = await connection.execute(
+      'SELECT id FROM pacientes WHERE id = ? AND eliminado_en IS NULL',
+      [paciente_id]
+    );
+    
+    if (!paciente.length) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
+
+    const [ultimoRegistro] = await connection.execute(
+      'SELECT id FROM registro WHERE paciente_id = ? AND estado = "finalizado" ORDER BY fecha_finalizacion DESC LIMIT 1',
+      [paciente_id]
+    );
+    const registro_id = ultimoRegistro[0]?.id || null;
+
+    const fechaDesde = new Date();
+    const fechaHasta = new Date(fechaDesde);
+    fechaHasta.setDate(fechaHasta.getDate() + (duracion_semanas * 7));
+
+    const planId = uuidv4();
+    await connection.execute(
+      `INSERT INTO planes_nutricionales (
+        id, registro_id, paciente_id, medico_id,
+        perfil_recomendado, perfil_recomendado_id, confianza_ia, respuesta_ia_completa,
+        datos_clinicos_base, objetivos, recomendaciones, duracion_semanas,
+        notas_adicionales, alergias, preferencias,
+        plan_detallado, estado, validado_por_ia,
+        fecha_creacion, fecha_vigencia_desde, fecha_vigencia_hasta
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        planId,
+        registro_id,
+        paciente_id,
+        medico_id || usuario_id,
+        perfil_recomendado || null,
+        perfil_recomendado_id || null,
+        confianza_ia || null,
+        respuesta_ia_completa ? JSON.stringify(respuesta_ia_completa) : null,
+        datos_clinicos_base ? JSON.stringify(datos_clinicos_base) : null,
+        objetivos ? JSON.stringify(objetivos) : null,
+        recomendaciones || null,
+        duracion_semanas || 4,
+        notas_adicionales || null,
+        alergias ? JSON.stringify(alergias) : null,
+        preferencias ? JSON.stringify(preferencias) : null,
+        plan_detallado ? JSON.stringify(plan_detallado) : null,
+        estado || 'borrador',
+        validado_por_ia ? 1 : 0,
+        fecha_creacion || new Date().toISOString(),
+        fechaDesde.toISOString().split('T')[0],
+        fechaHasta.toISOString().split('T')[0]
+      ]
+    );
+
+    console.log('✅ [PLAN] Plan creado:', { planId, paciente_id, perfil_recomendado });
+
+    return res.json({
+      error: false,
+      mensaje: 'Plan nutricional creado exitosamente',
+      plan_id: planId,
+      paciente_id,
+      perfil_recomendado,
+      fecha_vigencia: {
+        desde: fechaDesde.toISOString().split('T')[0],
+        hasta: fechaHasta.toISOString().split('T')[0]
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ [PLAN] Error creando plan:', err.message);
+    return res.status(500).json({
+      error: true,
+      mensaje: 'Error al crear el plan: ' + err.message,
+      detalles: process.env.NODE_ENV === 'development' ? err : undefined
+    });
+  } finally {
+    if (connection) { try { connection.release(); } catch (e) {} }
+  }
+});
+
+// ============================================================================
+// ✏️ ACTUALIZAR PLAN DETALLADO
+// PUT /nutricionapp-api/medico/plan-nutricional/:plan_id/detallado
+// ============================================================================
+router.put('/:plan_id/detallado', verificarToken, verificarRol('doctor', 'nutricionista'), async (req, res) => {
+  const { plan_id } = req.params;
+  const { plan_detallado } = req.body;
+  const usuario_id = req.usuario?.id;
+
+  if (!plan_id || !plan_detallado) {
+    return res.status(400).json({ error: true, mensaje: 'plan_id y plan_detallado son requeridos' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    const [plan] = await connection.execute(
+      'SELECT id, medico_id, paciente_id, estado FROM planes_nutricionales WHERE id = ?',
+      [plan_id]
+    );
+
+    if (!plan.length) {
+      return res.status(404).json({ error: true, mensaje: 'Plan no encontrado' });
+    }
+
+    if (plan[0].medico_id !== usuario_id) {
+      return res.status(403).json({ error: true, mensaje: 'No tienes permiso para editar este plan' });
+    }
+
+    await connection.execute(
+      `UPDATE planes_nutricionales 
+       SET plan_detallado = ?, 
+           estado = 'activo', 
+           fecha_actualizacion = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [JSON.stringify(plan_detallado), plan_id]
+    );
+
+    console.log('✅ [PLAN DETALLADO] Actualizado:', { 
+      plan_id, 
+      paciente_id: plan[0].paciente_id,
+      tiene_alimentos: !!plan_detallado?.weekly?.days?.[0]?.meals?.[0]?.foods?.[0]
+    });
+
+    return res.json({
+      error: false,
+      mensaje: 'Plan detallado actualizado exitosamente',
+      plan_id
+    });
+
+  } catch (err) {
+    console.error('❌ [PLAN DETALLADO] Error actualizando:', err.message);
+    return res.status(500).json({
+      error: true,
+      mensaje: 'Error al actualizar el plan detallado: ' + err.message
+    });
+  } finally {
+    if (connection) { try { connection.release(); } catch (e) {} }
+  }
+});
+
+console.log('✅ [ROUTER] medico-plan-nutricional.js cargado correctamente');
+module.exports = router;
