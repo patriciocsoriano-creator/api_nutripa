@@ -1,41 +1,28 @@
 # ============================================
-# 🎨 FRONTEND - Ionic/Angular
+# API NUTRICIÓN - Node.js / Express
 # ============================================
 
-# Etapa 1: Build
-FROM node:18-alpine AS builder
+# Imagen oficial de Node.js
+FROM node:18-alpine
 
+# Directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Copiar archivos de dependencias primero (para cache)
+# Copiar archivos de dependencias
 COPY package*.json ./
-COPY angular.json ./
-COPY tsconfig*.json ./
 
 # Instalar dependencias
-RUN npm ci --legacy-peer-deps
+RUN npm install --omit=dev
 
-# Copiar el resto del código
+# Copiar el resto del proyecto
 COPY . .
 
-# Build de producción
-RUN npm run build -- --configuration=production
+# Puerto de la aplicación
+EXPOSE 3000
 
-# Etapa 2: Servir con Nginx
-FROM nginx:alpine
+# Healthcheck opcional
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --spider -q http://localhost:3000/ || exit 1
 
-# Copiar configuración personalizada de nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copiar build desde la etapa anterior
-COPY --from=builder /app/www /usr/share/nginx/html
-
-# Exponer puerto
-EXPOSE 80
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
-
-#final
-CMD ["nginx", "-g", "daemon off;"]
+# Comando para iniciar la API
+CMD ["node", "index.js"]
