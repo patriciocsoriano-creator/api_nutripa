@@ -74,5 +74,13 @@ async function closePool() {
   console.log('✅ [CONEXION] Pool cerrado');
 }
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'API Nutrición activa',
+    db: 'connected module loaded'
+  });
+});
+
 console.log('✅ [CONEXION] Módulo exportado (pool inicializado)');
 module.exports = { getConnection, query, closePool, app, pool };
