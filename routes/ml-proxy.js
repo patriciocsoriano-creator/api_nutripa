@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const { verificarToken } = require('../middleware/auth');
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8001';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
 
 // POST /api/ml/prediccion-perfil
 router.post('/prediccion-perfil', verificarToken, async (req, res) => {
