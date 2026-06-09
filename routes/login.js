@@ -81,17 +81,17 @@ router.post('/', async (req, res) => {
 
   let connection;
   try {
-    // 👇 1️⃣ Obtener conexión del pool
+    //  Obtener conexión del pool
     connection = await getConnection();
     console.log('🔗 [LOGIN] Conexión obtenida del pool');
     
-    // 👇 2️⃣ Buscar usuario por correo (case-insensitive)
+    //  Buscar usuario por correo (case-insensitive)
     console.log('🔍 [LOGIN] Buscando usuario...');
     const [usuarios] = await connection.execute(
       `SELECT 
          u.id, u.correo, u.password_hash, u.nombre, u.apellido, 
          u.cedula, u.rol_id, u.activo, 
-         r.nombre as rol_nombre  -- 👈 Alias importante
+         r.nombre as rol_nombre  --  Alias importante
        FROM usuarios u
        INNER JOIN roles r ON u.rol_id = r.id
        WHERE u.correo = ? AND u.eliminado_en IS NULL`,
@@ -117,7 +117,7 @@ router.post('/', async (req, res) => {
     const usuario = usuarios[0];
     console.log('👤 [LOGIN] Usuario encontrado:', { 
       id: usuario.id, 
-      rol_nombre: usuario.rol_nombre,  // 👈 Verificar este valor
+      rol_nombre: usuario.rol_nombre,  //  Verificar este valor
       activo: usuario.activo 
     });
 
@@ -140,7 +140,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // 🚫 4️⃣ Verificar que el usuario esté activo
+    //  Verificar que el usuario esté activo
     if (!usuario.activo) {
       console.warn('⚠️ [LOGIN] Usuario inactivo:', email);
       await registrarAcceso(connection, {
@@ -156,7 +156,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // ✅ 5️⃣ Registrar acceso exitoso en historial
+    //  Registrar acceso exitoso en historial
     console.log('📝 [LOGIN] Registrando acceso exitoso...');
     await registrarAcceso(connection, {
       usuario_id: usuario.id,
@@ -166,12 +166,12 @@ router.post('/', async (req, res) => {
     });
     console.log('✅ [LOGIN] Historial actualizado');
 
-    // 🎫 6️⃣ Generar JWT Access Token
+    // Generar JWT Access Token
     console.log('🎫 [LOGIN] Generando tokens...');
     const token = jwt.sign(
       { 
         usuario_id: usuario.id, 
-        rol: usuario.rol_nombre,  // 👈 Usar rol_nombre del JOIN
+        rol: usuario.rol_nombre,  //  Usar rol_nombre del JOIN
         correo: usuario.correo 
       },
       SECRET,
@@ -282,7 +282,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 👇 Endpoint opcional: Refresh token
+// Endpoint opcional: Refresh token
 router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body;
   
@@ -325,7 +325,7 @@ router.post('/refresh', async (req, res) => {
     const newToken = jwt.sign(
       { 
         usuario_id: usuario[0].id, 
-        rol: usuario[0].rol_nombre,  // 👈 Usar rol_nombre
+        rol: usuario[0].rol_nombre,  //  Usar rol_nombre
         correo: usuario[0].correo 
       },
       SECRET,
