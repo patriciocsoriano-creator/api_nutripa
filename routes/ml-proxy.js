@@ -5,7 +5,7 @@ const { verificarToken } = require('../middleware/auth');
 
 // URL del microservicio
 const ML_SERVICE_URL =
-  process.env.ML_SERVICE_URL || 'http://microservicio.72.61.11.127.nip.io';
+  process.env.ML_SERVICE_URL || 'http://app-nutricion-microservicionutri-8wzlez:8001';
 
 console.log('🤖 ML_SERVICE_URL:', ML_SERVICE_URL);
 
