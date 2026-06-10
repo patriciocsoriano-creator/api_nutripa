@@ -11,11 +11,19 @@ const app = express();
 
 // ✅ CORS explícito
 app.use(cors({
-  origin: ['http://localhost:8100', 'http://localhost:4200', 'capacitor://localhost', 'http://localhost'],
+  origin: [
+    'http://localhost:8100',
+    'http://localhost:4200',
+    'capacitor://localhost',
+    'http://localhost',
+    'http://app.72.61.11.127.nip.io'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.options(/.*/, cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
