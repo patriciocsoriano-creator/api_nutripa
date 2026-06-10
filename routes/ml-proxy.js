@@ -89,34 +89,19 @@ router.post('/prediccion-perfil', verificarToken, async (req, res) => {
 router.get('/health', async (req, res) => {
   try {
 
-    console.log('🔍 Verificando estado del microservicio...');
-    console.log('📍 URL:', `${ML_SERVICE_URL}/health`);
+    console.log('🔥 ML HEALTH usando:', ML_SERVICE_URL);
 
     const response = await axios.get(
       `${ML_SERVICE_URL}/health`,
-      {
-        timeout: 5000
-      }
+      { timeout: 5000 }
     );
 
-    console.log('✅ Microservicio operativo');
-
-    return res.status(200).json(response.data);
+    return res.json(response.data);
 
   } catch (error) {
 
-    console.error('\n❌ HEALTH CHECK ML FALLÓ');
-    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.error('Mensaje:', error.message);
-    console.error('Código:', error.code);
-
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Data:', error.response.data);
-    }
-
-    console.error('URL usada:', `${ML_SERVICE_URL}/health`);
-    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    console.error('🔥 ML HEALTH usando:', ML_SERVICE_URL);
+    console.error(error.message);
 
     return res.status(503).json({
       status: 'unavailable',
@@ -126,5 +111,4 @@ router.get('/health', async (req, res) => {
     });
   }
 });
-
 module.exports = router;
