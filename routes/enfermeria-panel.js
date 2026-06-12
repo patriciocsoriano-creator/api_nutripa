@@ -385,5 +385,168 @@ router.get('/pacientes/buscar/:cedula', async (req, res) => {
   }
 });
 
+// ============================================================================
+// 👥 GET /nutricionapp-api/enfermeria/pacientes/todos
+// ✅ Obtener TODOS los pacientes registrados
+// ============================================================================
+router.get('/pacientes/todos', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+    console.log('👥 [TODOS] Cargando todos los pacientes para usuario:', usuarioId);
+
+    const [pacientes] = await connection.execute(
+      `SELECT 
+         p.id, 
+         CONCAT(p.nombres, ' ', p.apellidos) as nombre_completo,
+         p.numero_identificacion as cedula,
+         p.telefono,
+         r.id as registro_id,
+         r.estado as estado_registro,
+         r.creado_en as registro_creado_en,
+         r.fecha_finalizacion,
+         r.datos_personales,
+         r.signos_vitales,
+         r.datos_antropometricos,
+         r.condiciones_metabolicas
+       FROM pacientes p
+       INNER JOIN registro r ON r.paciente_id = p.id
+       WHERE r.registrado_por = ? 
+         AND r.estado != 'cancelado'
+         AND p.eliminado_en IS NULL
+       ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC`,
+      [usuarioId]
+    );
+
+    // Procesar cada paciente
+    const pacientesProcesados = pacientes.map(p => {
+      let progreso = 0;
+      let estado_real = 'iniciado';
+
+      if (p.estado_registro === 'finalizado') {
+        progreso = 100;
+        estado_real = 'finalizado';
+      } else {
+        let camposLlenos = 0;
+        if (p.datos_personales) camposLlenos++;
+        if (p.signos_vitales) camposLlenos++;
+        if (p.datos_antropometricos) camposLlenos++;
+        if (p.condiciones_metabolicas) camposLlenos++;
+        
+        progreso = Math.round((camposLlenos / 4) * 100);
+        estado_real = progreso > 0 ? 'en_proceso' : 'iniciado';
+      }
+
+      const alertas = [];
+      let tiene_alerta = false;
+      
+      if (p.signos_vitales) {
+        try {
+          const signos = typeof p.signos_vitales === 'string' 
+            ? JSON.parse(p.signos_vitales) 
+            : p.signos_vitales;
+          
+          if (signos?.presionArterial) {
+            const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
+            if (sist >= 180 || dia >= 120) {
+              alertas.push({ tipo: 'PA Crítica', nivel: 'critico' });
+              tiene_alerta = true;
+            } else if (sist >= 140 || dia >= 90) {
+              alertas.push({ tipo: 'PA Alta', nivel: 'alto' });
+              tiene_alerta = true;
+            }
+          }
+          
+          if (signos?.glucosaAyunas) {
+            if (signos.glucosaAyunas >= 200) {
+              alertas.push({ tipo: 'Glucosa Crítica', nivel: 'critico' });
+              tiene_alerta = true;
+            } else if (signos.glucosaAyunas >= 126) {
+              alertas.push({ tipo: 'Glucosa Alta', nivel: 'alto' });
+              tiene_alerta = true;
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Error procesando signos:', e.message);
+        }
+      }
+
+      return {
+        id: p.id,
+        nombre_completo: p.nombre_completo,
+        cedula: p.cedula,
+        telefono: p.telefono,
+        registro_id: p.registro_id,
+        estado_real: estado_real,
+        progreso: progreso,
+        alertas: alertas,
+        tiene_alerta: tiene_alerta,
+        ultima_fecha: p.fecha_finalizacion || p.registro_creado_en
+      };
+    });
+
+    console.log('✅ [TODOS] Pacientes encontrados:', pacientesProcesados.length);
+
+    return res.status(200).json({
+      error: false,
+      total: pacientesProcesados.length,
+      pacientes: pacientesProcesados
+    });
+
+  } catch (err) {
+    console.error('❌ [TODOS] Error:', err.message);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al cargar pacientes: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+// 🗑️ DELETE /nutricionapp-api/enfermeria/pacientes/:paciente_id
+// ✅ Eliminar paciente (soft delete)
+// ============================================================================
+router.delete('/pacientes/:paciente_id', async (req, res) => {
+  const { paciente_id } = req.params;
+  const usuarioId = req.usuario?.id;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+    
+    // Soft delete: marcar como eliminado
+    await connection.execute(
+      `UPDATE pacientes 
+       SET eliminado_en = NOW(), eliminado_por = ? 
+       WHERE id = ? AND eliminado_en IS NULL`,
+      [usuarioId, paciente_id]
+    );
+    
+    console.log(`🗑️ [DELETE] Paciente ${paciente_id} eliminado por ${usuarioId}`);
+    
+    return res.json({
+      error: false,
+      mensaje: 'Paciente eliminado correctamente'
+    });
+    
+  } catch (err) {
+    console.error('❌ [DELETE] Error:', err.message);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al eliminar paciente: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
 console.log('✅ [ROUTER] enfermeria-panel.js cargado correctamente');
 module.exports = router;
