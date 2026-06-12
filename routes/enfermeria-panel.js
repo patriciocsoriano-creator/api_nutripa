@@ -11,29 +11,30 @@ router.use(verificarToken);
 router.use(verificarRol('enfermera', 'nutricionista', 'admin'));
 
 // ============================================================================
+// ============================================================================
 // GET /nutricionapp-api/enfermeria/estadisticas
-// Estadisticas del dashboard de enfermeria
-// CORRECCION: Ahora muestra datos de TODO el equipo medico, no solo del usuario
+// Estadisticas del dashboard de enfermeria (GLOBAL - sin filtro de usuario)
 // ============================================================================
 router.get('/estadisticas', async (req, res) => {
   const usuarioId = req.usuario?.id;
+  
+  console.log('\n========================================');
+  console.log('[ESTADISTICAS] Endpoint llamado');
+  console.log('[ESTADISTICAS] Usuario:', usuarioId);
+  console.log('========================================\n');
   
   let connection;
   try {
     connection = await getConnection();
 
-    console.log('[ESTADISTICAS] Calculando para usuario:', usuarioId);
-
-    // 1. TOTAL DE PACIENTES ACTIVOS (todos los pacientes no eliminados)
+    // 1. TOTAL DE PACIENTES ACTIVOS
     const [totalPacientes] = await connection.execute(
       `SELECT COUNT(DISTINCT p.id) as total 
        FROM pacientes p
-       INNER JOIN registro r ON r.paciente_id = p.id 
-       WHERE p.eliminado_en IS NULL 
-         AND r.estado != 'cancelado'`
+       WHERE p.eliminado_en IS NULL`
     );
 
-    // 2. REGISTROS DE HOY (todos los registros del dia actual)
+    // 2. REGISTROS DE HOY
     const [registrosHoy] = await connection.execute(
       `SELECT COUNT(*) as total
        FROM registro 
@@ -41,7 +42,7 @@ router.get('/estadisticas', async (req, res) => {
          AND estado != 'cancelado'`
     );
 
-    // 3. REGISTROS TOTALES DEL MES ACTUAL
+    // 3. REGISTROS DEL MES
     const [registrosMes] = await connection.execute(
       `SELECT COUNT(*) as total
        FROM registro 
@@ -50,14 +51,14 @@ router.get('/estadisticas', async (req, res) => {
          AND estado != 'cancelado'`
     );
 
-    // 4. REGISTROS PENDIENTES (en progreso)
+    // 4. REGISTROS PENDIENTES
     const [pendientes] = await connection.execute(
       `SELECT COUNT(*) as pendientes 
        FROM registro 
        WHERE estado NOT IN ('finalizado', 'cancelado')`
     );
 
-    // 5. ALERTAS ACTIVAS (global, sin filtro de usuario)
+    // 5. ALERTAS ACTIVAS
     const [detalleAlertas] = await connection.execute(
       `SELECT 
         r.paciente_id,
@@ -80,7 +81,7 @@ router.get('/estadisticas', async (req, res) => {
        LIMIT 10`
     );
 
-    // Procesar alertas para identificar cuales son criticas
+    // Procesar alertas
     const alertasActivas = [];
     for (const alerta of detalleAlertas) {
       try {
@@ -91,7 +92,6 @@ router.get('/estadisticas', async (req, res) => {
         let tipoAlerta = [];
         let nivel = 'medio';
         
-        // Verificar presion arterial
         if (signos?.presionArterial) {
           const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
           if (sist >= 180 || dia >= 120) {
@@ -103,7 +103,6 @@ router.get('/estadisticas', async (req, res) => {
           }
         }
         
-        // Verificar glucosa
         if (signos?.glucosaAyunas) {
           if (signos.glucosaAyunas >= 200) {
             tipoAlerta.push(`Glucosa: ${signos.glucosaAyunas} mg/dL (CRITICA)`);
@@ -114,7 +113,6 @@ router.get('/estadisticas', async (req, res) => {
           }
         }
         
-        // Verificar SpO2
         if (signos?.spo2 && signos.spo2 < 90) {
           tipoAlerta.push(`SpO2: ${signos.spo2}% (CRITICA)`);
           nivel = 'critico';
@@ -135,33 +133,33 @@ router.get('/estadisticas', async (req, res) => {
       }
     }
 
-    // Logs de debug
-    console.log('[ESTADISTICAS] Resultados:', {
+    const resultado = {
       total_pacientes: totalPacientes[0]?.total || 0,
       registros_hoy: registrosHoy[0]?.total || 0,
       registros_mes: registrosMes[0]?.total || 0,
-      pendientes: pendientes[0]?.pendientes || 0,
-      alertas_activas: alertasActivas.length
-    });
+      registros_pendientes: pendientes[0]?.pendientes || 0,
+      alertas_activas: alertasActivas.length,
+      detalle_alertas: alertasActivas
+    };
+
+    console.log('========================================');
+    console.log('[ESTADISTICAS] Resultado final:');
+    console.log(resultado);
+    console.log('========================================\n');
 
     return res.status(200).json({
       error: false,
-      datos: {
-        total_pacientes: totalPacientes[0]?.total || 0,
-        registros_hoy: registrosHoy[0]?.total || 0,
-        registros_mes: registrosMes[0]?.total || 0,
-        registros_pendientes: pendientes[0]?.pendientes || 0,
-        alertas_activas: alertasActivas.length,
-        detalle_alertas: alertasActivas
-      }
+      datos: resultado
     });
 
   } catch (err) {
-    console.error('[ESTADISTICAS] Error:', {
-      message: err.message,
-      code: err.code,
-      sql: err.sql
-    });
+    console.error('\n========================================');
+    console.error('[ESTADISTICAS] ERROR CRITICO:');
+    console.error('Mensaje:', err.message);
+    console.error('Codigo:', err.code);
+    console.error('SQL:', err.sql);
+    console.error('========================================\n');
+    
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al cargar estadisticas: ' + err.message 
