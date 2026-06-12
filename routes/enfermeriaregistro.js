@@ -154,7 +154,8 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
 });
 
 // ==========================================
-// 🚀 INICIAR NUEVO REGISTRO CLÍNICO
+//  INICIAR NUEVO REGISTRO CLÍNICO
+//  CORREGIDO: Reactiva pacientes eliminados en lugar de fallar
 // ==========================================
 router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor'), async (req, res) => {
   console.log('🆕 [REGISTRO] Iniciando nuevo registro', { cedula: req.body?.cedula });
@@ -170,39 +171,102 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
   try {
     connection = await getConnection();
 
-    const [existePaciente] = await connection.execute(
-      `SELECT id FROM pacientes WHERE numero_identificacion = ? AND eliminado_en IS NULL`,
+    // 1️⃣ Buscar paciente SIN filtro de eliminado_en
+    const [pacientesExistentes] = await connection.execute(
+      `SELECT id, eliminado_en FROM pacientes WHERE numero_identificacion = ?`,
       [cedula]
     );
 
-    let paciente_id = existePaciente.length > 0 ? existePaciente[0].id : uuidv4();
-    
-    if (!existePaciente.length) {
+    let paciente_id;
+
+    if (pacientesExistentes.length > 0) {
+      paciente_id = pacientesExistentes[0].id;
+      
+      // 2️⃣ Si existe pero estaba eliminado → REACTIVAR
+      if (pacientesExistentes[0].eliminado_en) {
+        console.log(`[REGISTRO] Reactivando paciente eliminado: ${cedula}`);
+        await connection.execute(
+          `UPDATE pacientes 
+           SET eliminado_en = NULL, 
+               eliminado_por = NULL,
+               nombres = ?, 
+               apellidos = ?,
+               actualizado_en = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [nombres.trim(), apellidos.trim(), paciente_id]
+        );
+      } else {
+        // 3️⃣ Si existe y está activo → verificar si tiene registro en progreso
+        const [registrosActivos] = await connection.execute(
+          `SELECT id FROM registro 
+           WHERE paciente_id = ? AND estado NOT IN ('finalizado', 'cancelado')`,
+          [paciente_id]
+        );
+
+        if (registrosActivos.length > 0) {
+          return res.status(409).json({
+            error: true,
+            mensaje: 'El paciente ya tiene un registro en progreso',
+            registro_id: registrosActivos[0].id
+          });
+        }
+      }
+    } else {
+      // 4️⃣ Si NO existe → crear nuevo paciente
+      console.log(`[REGISTRO] Creando nuevo paciente: ${cedula}`);
+      paciente_id = uuidv4();
+      
       await connection.execute(
-        `INSERT INTO pacientes (id, usuario_id, nombres, apellidos, numero_identificacion, activo)
-         VALUES (?, NULL, ?, ?, ?, 1)`,
+        `INSERT INTO pacientes (id, nombres, apellidos, numero_identificacion, activo, creado_en)
+         VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`,
         [paciente_id, nombres.trim(), apellidos.trim(), cedula]
       );
     }
 
+    // 5️⃣ Crear el nuevo registro clínico
     const registro_id = uuidv4();
     await connection.execute(
-      `INSERT INTO registro (id, paciente_id, registrado_por, estado) VALUES (?, ?, ?, 'iniciado')`,
+      `INSERT INTO registro (id, paciente_id, registrado_por, estado, creado_en) 
+       VALUES (?, ?, ?, 'iniciado', CURRENT_TIMESTAMP)`,
       [registro_id, paciente_id, registrado_por]
     );
 
-    console.log('✅ [REGISTRO] Registro iniciado', { registro_id, estado: 'iniciado' });
+    console.log('✅ [REGISTRO] Registro iniciado', { registro_id, paciente_id, estado: 'iniciado' });
 
     return res.status(201).json({
-      error: false, mensaje: 'Registro iniciado', registro_id, paciente_id,
-      estado: 'iniciado', siguiente_paso: 'iniciado'
+      error: false,
+      mensaje: 'Registro iniciado correctamente',
+      registro_id,
+      paciente_id,
+      estado: 'iniciado',
+      siguiente_paso: 'registroinfopaciente'
     });
 
   } catch (err) {
-    console.error('❌ [REGISTRO] Error:', err.message);
-    return res.status(500).json({ error: true, mensaje: 'Error: ' + err.message });
+    console.error('❌ [REGISTRO] Error:', {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage
+    });
+    
+    // Manejo específico de errores
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        error: true,
+        mensaje: 'Ya existe un registro con esta cédula',
+        codigo: 'DUPLICATE_ENTRY'
+      });
+    }
+    
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al iniciar registro: ' + err.message 
+    });
   } finally {
-    if (connection) { try { connection.release(); } catch (e) {} }
+    if (connection) { 
+      try { connection.release(); } catch (e) {} 
+    }
   }
 });
 
