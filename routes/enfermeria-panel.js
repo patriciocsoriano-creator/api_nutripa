@@ -183,25 +183,27 @@ router.get('/estadisticas', async (req, res) => {
 
 // ============================================================================
 // 👥 GET /nutricionapp-api/enfermeria/pacientes/recientes
-// ✅ CORREGIDO: Prioriza registro FINALIZADO y considera plan del médico
-// ============================================================================
-// ============================================================================
-// 👥 GET /nutricionapp-api/enfermeria/pacientes/recientes
-// ✅ SIMPLIFICADO: Sin subconsultas problemáticas
+// ✅ CORREGIDO: LIMIT interpolado (no como ?) para evitar error de MySQL
 // ============================================================================
 router.get('/pacientes/recientes', async (req, res) => {
   const { limit = 6 } = req.query;
   const usuarioId = req.usuario?.id;
   
-  // ✅ Validar que limit sea un número válido
+  // ✅ Validar que limit sea un número entero positivo
   const limitNum = parseInt(limit) || 6;
+  if (limitNum < 1 || limitNum > 100) {
+    return res.status(400).json({ 
+      error: true, 
+      mensaje: 'El parámetro limit debe estar entre 1 y 100' 
+    });
+  }
   
   let connection;
   try {
     connection = await getConnection();
     console.log('👥 [PACIENTES] Cargando recientes para usuario:', usuarioId, 'limit:', limitNum);
 
-    // ✅ CONSULTA SIMPLIFICADA - Sin subconsultas problemáticas
+    // ✅ CONSULTA CON LIMIT INTERPOLADO (seguro porque ya validamos que es número)
     const [pacientes] = await connection.execute(
       `SELECT 
          p.id, 
@@ -222,8 +224,8 @@ router.get('/pacientes/recientes', async (req, res) => {
          AND r.estado != 'cancelado'
          AND p.eliminado_en IS NULL
        ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC
-       LIMIT ?`,
-      [usuarioId, limitNum]
+       LIMIT ${limitNum}`,
+      [usuarioId]
     );
 
     console.log('✅ [PACIENTES] Consulta ejecutada, encontrados:', pacientes.length);
@@ -233,12 +235,10 @@ router.get('/pacientes/recientes', async (req, res) => {
       let progreso = 0;
       let estado_real = 'iniciado';
 
-      // Calcular progreso basado en el estado del registro
       if (p.estado_registro === 'finalizado') {
         progreso = 100;
         estado_real = 'finalizado';
       } else {
-        // Contar campos llenos
         let camposLlenos = 0;
         if (p.datos_personales) camposLlenos++;
         if (p.signos_vitales) camposLlenos++;
@@ -249,7 +249,6 @@ router.get('/pacientes/recientes', async (req, res) => {
         estado_real = progreso > 0 ? 'en_proceso' : 'iniciado';
       }
 
-      // Detectar alertas en signos vitales
       const alertas = [];
       let tiene_alerta = false;
       
@@ -291,8 +290,6 @@ router.get('/pacientes/recientes', async (req, res) => {
 
       const ultima_fecha = p.fecha_finalizacion || p.registro_creado_en;
 
-      console.log(`📊 [PROGRESO] ${p.nombre_completo}: ${progreso}% (${estado_real})`);
-
       return {
         id: p.id,
         nombre_completo: p.nombre_completo,
@@ -315,13 +312,11 @@ router.get('/pacientes/recientes', async (req, res) => {
     });
 
   } catch (err) {
-    // ✅ Log detallado del error
     console.error('❌ [PACIENTES] Error detallado:', {
       message: err.message,
       code: err.code,
       sql: err.sql,
-      sqlMessage: err.sqlMessage,
-      parameters: { usuarioId, limit: limitNum }
+      sqlMessage: err.sqlMessage
     });
     
     return res.status(500).json({ 
@@ -334,6 +329,8 @@ router.get('/pacientes/recientes', async (req, res) => {
     }
   }
 });
+
+
 // ============================================================================
 // 🔍 GET /nutricionapp-api/enfermeria/pacientes/buscar/:cedula
 // ============================================================================
