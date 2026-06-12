@@ -4,15 +4,16 @@ const router = express.Router();
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando enfermeria-panel.js');
+console.log('[ROUTER] Cargando enfermeria-panel.js');
 
 // Middleware: solo enfermeras, nutricionistas y admin
 router.use(verificarToken);
 router.use(verificarRol('enfermera', 'nutricionista', 'admin'));
 
 // ============================================================================
-// 📊 GET /nutricionapp-api/enfermeria/estadisticas
-// 👉 Estadísticas del dashboard de enfermería
+// GET /nutricionapp-api/enfermeria/estadisticas
+// Estadisticas del dashboard de enfermeria
+// CORRECCION: Ahora muestra datos de TODO el equipo medico, no solo del usuario
 // ============================================================================
 router.get('/estadisticas', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -21,51 +22,42 @@ router.get('/estadisticas', async (req, res) => {
   try {
     connection = await getConnection();
 
-    console.log('📊 [ESTADÍSTICAS] Calculando para usuario:', usuarioId);
+    console.log('[ESTADISTICAS] Calculando para usuario:', usuarioId);
 
-    // 1️⃣ TOTAL DE PACIENTES ASIGNADOS (registros creados por este usuario)
+    // 1. TOTAL DE PACIENTES ACTIVOS (todos los pacientes no eliminados)
     const [totalPacientes] = await connection.execute(
       `SELECT COUNT(DISTINCT p.id) as total 
        FROM pacientes p
        INNER JOIN registro r ON r.paciente_id = p.id 
-       WHERE r.registrado_por = ? 
-         AND p.eliminado_en IS NULL 
-         AND r.estado != 'cancelado'`,
-      [usuarioId]
+       WHERE p.eliminado_en IS NULL 
+         AND r.estado != 'cancelado'`
     );
 
-    // 2️⃣ REGISTROS DE HOY (del día actual, creados por este usuario)
+    // 2. REGISTROS DE HOY (todos los registros del dia actual)
     const [registrosHoy] = await connection.execute(
       `SELECT COUNT(*) as total
        FROM registro 
-       WHERE registrado_por = ? 
-         AND DATE(creado_en) = CURRENT_DATE 
-         AND estado != 'cancelado'`,
-      [usuarioId]
+       WHERE DATE(creado_en) = CURRENT_DATE 
+         AND estado != 'cancelado'`
     );
 
-    // 3️⃣ REGISTROS TOTALES DEL MES ACTUAL (creados por este usuario)
+    // 3. REGISTROS TOTALES DEL MES ACTUAL
     const [registrosMes] = await connection.execute(
       `SELECT COUNT(*) as total
        FROM registro 
-       WHERE registrado_por = ? 
-         AND MONTH(creado_en) = MONTH(CURDATE())
+       WHERE MONTH(creado_en) = MONTH(CURDATE())
          AND YEAR(creado_en) = YEAR(CURDATE())
-         AND estado != 'cancelado'`,
-      [usuarioId]
+         AND estado != 'cancelado'`
     );
 
-    // 4️⃣ REGISTROS PENDIENTES (para mostrar en panel)
+    // 4. REGISTROS PENDIENTES (en progreso)
     const [pendientes] = await connection.execute(
       `SELECT COUNT(*) as pendientes 
        FROM registro 
-       WHERE registrado_por = ? 
-         AND estado NOT IN ('finalizado', 'cancelado')`,
-      [usuarioId]
+       WHERE estado NOT IN ('finalizado', 'cancelado')`
     );
 
-    // 5️⃣ ALERTAS ACTIVAS (presión arterial alta o glucosa alta del último registro)
-    // ⚠️ NOTA: Las alertas son GLOBALES (no filtradas por usuario)
+    // 5. ALERTAS ACTIVAS (global, sin filtro de usuario)
     const [detalleAlertas] = await connection.execute(
       `SELECT 
         r.paciente_id,
@@ -88,7 +80,7 @@ router.get('/estadisticas', async (req, res) => {
        LIMIT 10`
     );
 
-    // Procesar alertas para identificar cuáles son críticas
+    // Procesar alertas para identificar cuales son criticas
     const alertasActivas = [];
     for (const alerta of detalleAlertas) {
       try {
@@ -99,11 +91,11 @@ router.get('/estadisticas', async (req, res) => {
         let tipoAlerta = [];
         let nivel = 'medio';
         
-        // Verificar presión arterial
+        // Verificar presion arterial
         if (signos?.presionArterial) {
           const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
           if (sist >= 180 || dia >= 120) {
-            tipoAlerta.push(`PA: ${signos.presionArterial} (CRÍTICA)`);
+            tipoAlerta.push(`PA: ${signos.presionArterial} (CRITICA)`);
             nivel = 'critico';
           } else if (sist >= 140 || dia >= 90) {
             tipoAlerta.push(`PA: ${signos.presionArterial}`);
@@ -114,7 +106,7 @@ router.get('/estadisticas', async (req, res) => {
         // Verificar glucosa
         if (signos?.glucosaAyunas) {
           if (signos.glucosaAyunas >= 200) {
-            tipoAlerta.push(`Glucosa: ${signos.glucosaAyunas} mg/dL (CRÍTICA)`);
+            tipoAlerta.push(`Glucosa: ${signos.glucosaAyunas} mg/dL (CRITICA)`);
             nivel = 'critico';
           } else if (signos.glucosaAyunas >= 126) {
             tipoAlerta.push(`Glucosa: ${signos.glucosaAyunas} mg/dL`);
@@ -124,7 +116,7 @@ router.get('/estadisticas', async (req, res) => {
         
         // Verificar SpO2
         if (signos?.spo2 && signos.spo2 < 90) {
-          tipoAlerta.push(`SpO2: ${signos.spo2}% (CRÍTICA)`);
+          tipoAlerta.push(`SpO2: ${signos.spo2}% (CRITICA)`);
           nivel = 'critico';
         }
         
@@ -139,12 +131,12 @@ router.get('/estadisticas', async (req, res) => {
           });
         }
       } catch (e) {
-        console.warn('⚠️ Error procesando alerta:', e.message);
+        console.warn('[ESTADISTICAS] Error procesando alerta:', e.message);
       }
     }
 
-    // 📝 LOGS DE DEBUG
-    console.log('📊 [ESTADÍSTICAS] Resultados:', {
+    // Logs de debug
+    console.log('[ESTADISTICAS] Resultados:', {
       total_pacientes: totalPacientes[0]?.total || 0,
       registros_hoy: registrosHoy[0]?.total || 0,
       registros_mes: registrosMes[0]?.total || 0,
@@ -156,7 +148,7 @@ router.get('/estadisticas', async (req, res) => {
       error: false,
       datos: {
         total_pacientes: totalPacientes[0]?.total || 0,
-        citas_hoy: registrosHoy[0]?.total || 0,
+        registros_hoy: registrosHoy[0]?.total || 0,
         registros_mes: registrosMes[0]?.total || 0,
         registros_pendientes: pendientes[0]?.pendientes || 0,
         alertas_activas: alertasActivas.length,
@@ -165,14 +157,14 @@ router.get('/estadisticas', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [ESTADÍSTICAS] Error:', {
+    console.error('[ESTADISTICAS] Error:', {
       message: err.message,
       code: err.code,
       sql: err.sql
     });
     return res.status(500).json({ 
       error: true, 
-      mensaje: 'Error al cargar estadísticas: ' + err.message 
+      mensaje: 'Error al cargar estadisticas: ' + err.message 
     });
   } finally {
     if (connection) {
@@ -182,28 +174,27 @@ router.get('/estadisticas', async (req, res) => {
 });
 
 // ============================================================================
-// 👥 GET /nutricionapp-api/enfermeria/pacientes/recientes
-// ✅ CORREGIDO: LIMIT interpolado (no como ?) para evitar error de MySQL
+// GET /nutricionapp-api/enfermeria/pacientes/recientes
+// CORRECCION: LIMIT interpolado + muestra pacientes de todo el equipo
 // ============================================================================
 router.get('/pacientes/recientes', async (req, res) => {
   const { limit = 6 } = req.query;
-  const usuarioId = req.usuario?.id;
   
-  // ✅ Validar que limit sea un número entero positivo
+  // Validar que limit sea un numero entero positivo
   const limitNum = parseInt(limit) || 6;
   if (limitNum < 1 || limitNum > 100) {
     return res.status(400).json({ 
       error: true, 
-      mensaje: 'El parámetro limit debe estar entre 1 y 100' 
+      mensaje: 'El parametro limit debe estar entre 1 y 100' 
     });
   }
   
   let connection;
   try {
     connection = await getConnection();
-    console.log('👥 [PACIENTES] Cargando recientes para usuario:', usuarioId, 'limit:', limitNum);
+    console.log('[PACIENTES] Cargando recientes, limit:', limitNum);
 
-    // ✅ CONSULTA CON LIMIT INTERPOLADO (seguro porque ya validamos que es número)
+    // CONSULTA CON LIMIT INTERPOLADO - Muestra pacientes de todo el equipo
     const [pacientes] = await connection.execute(
       `SELECT 
          p.id, 
@@ -220,17 +211,15 @@ router.get('/pacientes/recientes', async (req, res) => {
          r.condiciones_metabolicas
        FROM pacientes p
        INNER JOIN registro r ON r.paciente_id = p.id
-       WHERE r.registrado_por = ? 
-         AND r.estado != 'cancelado'
+       WHERE r.estado != 'cancelado'
          AND p.eliminado_en IS NULL
        ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC
-       LIMIT ${limitNum}`,
-      [usuarioId]
+       LIMIT ${limitNum}`
     );
 
-    console.log('✅ [PACIENTES] Consulta ejecutada, encontrados:', pacientes.length);
+    console.log('[PACIENTES] Consulta ejecutada, encontrados:', pacientes.length);
 
-    // ✅ Procesar cada paciente
+    // Procesar cada paciente
     const pacientesProcesados = pacientes.map(p => {
       let progreso = 0;
       let estado_real = 'iniciado';
@@ -261,7 +250,7 @@ router.get('/pacientes/recientes', async (req, res) => {
           if (signos?.presionArterial) {
             const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
             if (sist >= 180 || dia >= 120) {
-              alertas.push({ tipo: 'PA Crítica', nivel: 'critico' });
+              alertas.push({ tipo: 'PA Critica', nivel: 'critico' });
               tiene_alerta = true;
             } else if (sist >= 140 || dia >= 90) {
               alertas.push({ tipo: 'PA Alta', nivel: 'alto' });
@@ -271,7 +260,7 @@ router.get('/pacientes/recientes', async (req, res) => {
           
           if (signos?.glucosaAyunas) {
             if (signos.glucosaAyunas >= 200) {
-              alertas.push({ tipo: 'Glucosa Crítica', nivel: 'critico' });
+              alertas.push({ tipo: 'Glucosa Critica', nivel: 'critico' });
               tiene_alerta = true;
             } else if (signos.glucosaAyunas >= 126) {
               alertas.push({ tipo: 'Glucosa Alta', nivel: 'alto' });
@@ -284,7 +273,7 @@ router.get('/pacientes/recientes', async (req, res) => {
             tiene_alerta = true;
           }
         } catch (e) {
-          console.warn('⚠️ Error procesando signos:', e.message);
+          console.warn('[PACIENTES] Error procesando signos:', e.message);
         }
       }
 
@@ -304,7 +293,7 @@ router.get('/pacientes/recientes', async (req, res) => {
       };
     });
 
-    console.log('✅ [PACIENTES] Procesados:', pacientesProcesados.length);
+    console.log('[PACIENTES] Procesados:', pacientesProcesados.length);
 
     return res.status(200).json({
       error: false,
@@ -312,7 +301,7 @@ router.get('/pacientes/recientes', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PACIENTES] Error detallado:', {
+    console.error('[PACIENTES] Error detallado:', {
       message: err.message,
       code: err.code,
       sql: err.sql,
@@ -330,9 +319,8 @@ router.get('/pacientes/recientes', async (req, res) => {
   }
 });
 
-
 // ============================================================================
-// 🔍 GET /nutricionapp-api/enfermeria/pacientes/buscar/:cedula
+// GET /nutricionapp-api/enfermeria/pacientes/buscar/:cedula
 // ============================================================================
 router.get('/pacientes/buscar/:cedula', async (req, res) => {
   const { cedula } = req.params;
@@ -376,7 +364,7 @@ router.get('/pacientes/buscar/:cedula', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ Error búsqueda:', err);
+    console.error('[BUSCAR] Error:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al buscar paciente' });
   } finally {
     if (connection) {
@@ -386,16 +374,14 @@ router.get('/pacientes/buscar/:cedula', async (req, res) => {
 });
 
 // ============================================================================
-// 👥 GET /nutricionapp-api/enfermeria/pacientes/todos
-// ✅ Obtener TODOS los pacientes registrados
+// GET /nutricionapp-api/enfermeria/pacientes/todos
+// Obtener TODOS los pacientes registrados (sin filtro de usuario)
 // ============================================================================
 router.get('/pacientes/todos', async (req, res) => {
-  const usuarioId = req.usuario?.id;
-  
   let connection;
   try {
     connection = await getConnection();
-    console.log('👥 [TODOS] Cargando todos los pacientes para usuario:', usuarioId);
+    console.log('[TODOS] Cargando todos los pacientes');
 
     const [pacientes] = await connection.execute(
       `SELECT 
@@ -413,11 +399,9 @@ router.get('/pacientes/todos', async (req, res) => {
          r.condiciones_metabolicas
        FROM pacientes p
        INNER JOIN registro r ON r.paciente_id = p.id
-       WHERE r.registrado_por = ? 
-         AND r.estado != 'cancelado'
+       WHERE r.estado != 'cancelado'
          AND p.eliminado_en IS NULL
-       ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC`,
-      [usuarioId]
+       ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC`
     );
 
     // Procesar cada paciente
@@ -451,7 +435,7 @@ router.get('/pacientes/todos', async (req, res) => {
           if (signos?.presionArterial) {
             const [sist, dia] = String(signos.presionArterial).split('/').map(n => parseInt(n.trim()));
             if (sist >= 180 || dia >= 120) {
-              alertas.push({ tipo: 'PA Crítica', nivel: 'critico' });
+              alertas.push({ tipo: 'PA Critica', nivel: 'critico' });
               tiene_alerta = true;
             } else if (sist >= 140 || dia >= 90) {
               alertas.push({ tipo: 'PA Alta', nivel: 'alto' });
@@ -461,7 +445,7 @@ router.get('/pacientes/todos', async (req, res) => {
           
           if (signos?.glucosaAyunas) {
             if (signos.glucosaAyunas >= 200) {
-              alertas.push({ tipo: 'Glucosa Crítica', nivel: 'critico' });
+              alertas.push({ tipo: 'Glucosa Critica', nivel: 'critico' });
               tiene_alerta = true;
             } else if (signos.glucosaAyunas >= 126) {
               alertas.push({ tipo: 'Glucosa Alta', nivel: 'alto' });
@@ -469,7 +453,7 @@ router.get('/pacientes/todos', async (req, res) => {
             }
           }
         } catch (e) {
-          console.warn('⚠️ Error procesando signos:', e.message);
+          console.warn('[TODOS] Error procesando signos:', e.message);
         }
       }
 
@@ -487,7 +471,7 @@ router.get('/pacientes/todos', async (req, res) => {
       };
     });
 
-    console.log('✅ [TODOS] Pacientes encontrados:', pacientesProcesados.length);
+    console.log('[TODOS] Pacientes encontrados:', pacientesProcesados.length);
 
     return res.status(200).json({
       error: false,
@@ -496,7 +480,7 @@ router.get('/pacientes/todos', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [TODOS] Error:', err.message);
+    console.error('[TODOS] Error:', err.message);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al cargar pacientes: ' + err.message 
@@ -509,8 +493,8 @@ router.get('/pacientes/todos', async (req, res) => {
 });
 
 // ============================================================================
-// 🗑️ DELETE /nutricionapp-api/enfermeria/pacientes/:paciente_id
-// ✅ Eliminar paciente (soft delete)
+// DELETE /nutricionapp-api/enfermeria/pacientes/:paciente_id
+// Eliminar paciente (soft delete)
 // ============================================================================
 router.delete('/pacientes/:paciente_id', async (req, res) => {
   const { paciente_id } = req.params;
@@ -528,7 +512,7 @@ router.delete('/pacientes/:paciente_id', async (req, res) => {
       [usuarioId, paciente_id]
     );
     
-    console.log(`🗑️ [DELETE] Paciente ${paciente_id} eliminado por ${usuarioId}`);
+    console.log(`[DELETE] Paciente ${paciente_id} eliminado por ${usuarioId}`);
     
     return res.json({
       error: false,
@@ -536,7 +520,7 @@ router.delete('/pacientes/:paciente_id', async (req, res) => {
     });
     
   } catch (err) {
-    console.error('❌ [DELETE] Error:', err.message);
+    console.error('[DELETE] Error:', err.message);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al eliminar paciente: ' + err.message 
@@ -548,5 +532,5 @@ router.delete('/pacientes/:paciente_id', async (req, res) => {
   }
 });
 
-console.log('✅ [ROUTER] enfermeria-panel.js cargado correctamente');
+console.log('[ROUTER] enfermeria-panel.js cargado correctamente');
 module.exports = router;
