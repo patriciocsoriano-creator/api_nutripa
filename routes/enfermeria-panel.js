@@ -185,16 +185,23 @@ router.get('/estadisticas', async (req, res) => {
 // 👥 GET /nutricionapp-api/enfermeria/pacientes/recientes
 // ✅ CORREGIDO: Prioriza registro FINALIZADO y considera plan del médico
 // ============================================================================
+// ============================================================================
+// 👥 GET /nutricionapp-api/enfermeria/pacientes/recientes
+// ✅ SIMPLIFICADO: Sin subconsultas problemáticas
+// ============================================================================
 router.get('/pacientes/recientes', async (req, res) => {
   const { limit = 6 } = req.query;
   const usuarioId = req.usuario?.id;
   
+  // ✅ Validar que limit sea un número válido
+  const limitNum = parseInt(limit) || 6;
+  
   let connection;
   try {
     connection = await getConnection();
+    console.log('👥 [PACIENTES] Cargando recientes para usuario:', usuarioId, 'limit:', limitNum);
 
-    console.log('👥 [PACIENTES] Cargando recientes para usuario:', usuarioId);
-
+    // ✅ CONSULTA SIMPLIFICADA - Sin subconsultas problemáticas
     const [pacientes] = await connection.execute(
       `SELECT 
          p.id, 
@@ -208,78 +215,41 @@ router.get('/pacientes/recientes', async (req, res) => {
          r.datos_personales,
          r.signos_vitales,
          r.datos_antropometricos,
-         r.condiciones_metabolicas,
-         -- Subquery: ¿Existe plan nutricional activo?
-         (SELECT COUNT(*) FROM planes_nutricionales pn 
-          WHERE pn.paciente_id = p.id AND pn.estado = 'activo') as planes_activos,
-         -- Subquery: ¿Existe plan con detalle completo?
-         (SELECT COUNT(*) FROM planes_nutricionales pn 
-          WHERE pn.paciente_id = p.id 
-            AND pn.estado = 'activo' 
-            AND pn.plan_detallado IS NOT NULL) as planes_completos
+         r.condiciones_metabolicas
        FROM pacientes p
-       INNER JOIN (
-         SELECT 
-           paciente_id,
-           id,
-           estado,
-           creado_en,
-           fecha_finalizacion,
-           datos_personales,
-           signos_vitales,
-           datos_antropometricos,
-           condiciones_metabolicas,
-           ROW_NUMBER() OVER (
-             PARTITION BY paciente_id 
-             ORDER BY 
-               CASE estado 
-                 WHEN 'finalizado' THEN 1 
-                 WHEN 'metabolicas' THEN 2 
-                 WHEN 'antropometricos' THEN 3 
-                 WHEN 'signos_vitales' THEN 4 
-                 WHEN 'datos_personales' THEN 5 
-                 ELSE 6 
-               END,
-               creado_en DESC
-           ) as rn
-         FROM registro
-         WHERE registrado_por = ? AND estado != 'cancelado'
-       ) r ON r.paciente_id = p.id AND r.rn = 1
-       WHERE p.eliminado_en IS NULL
+       INNER JOIN registro r ON r.paciente_id = p.id
+       WHERE r.registrado_por = ? 
+         AND r.estado != 'cancelado'
+         AND p.eliminado_en IS NULL
        ORDER BY COALESCE(r.fecha_finalizacion, r.creado_en) DESC
        LIMIT ?`,
-      [usuarioId, parseInt(limit)]
+      [usuarioId, limitNum]
     );
 
-    // ✅ Procesar cada paciente con cálculo de progreso CORREGIDO
+    console.log('✅ [PACIENTES] Consulta ejecutada, encontrados:', pacientes.length);
+
+    // ✅ Procesar cada paciente
     const pacientesProcesados = pacientes.map(p => {
       let progreso = 0;
       let estado_real = 'iniciado';
 
-      // ============================================
-      // ✅ CÁLCULO DE PROGRESO CORREGIDO
-      // ============================================
-      
-      // Si el registro está FINALIZADO → 100% (enfermería completó su parte)
+      // Calcular progreso basado en el estado del registro
       if (p.estado_registro === 'finalizado') {
         progreso = 100;
         estado_real = 'finalizado';
       } else {
-        // Contar campos llenos para progreso parcial
+        // Contar campos llenos
         let camposLlenos = 0;
         if (p.datos_personales) camposLlenos++;
         if (p.signos_vitales) camposLlenos++;
         if (p.datos_antropometricos) camposLlenos++;
         if (p.condiciones_metabolicas) camposLlenos++;
         
-        // Progreso proporcional (4 campos = 100%)
         progreso = Math.round((camposLlenos / 4) * 100);
-        estado_real = 'en_proceso';
+        estado_real = progreso > 0 ? 'en_proceso' : 'iniciado';
       }
 
-      // ============================================
-      // DETECTAR ALERTAS EN SIGNOS VITALES
-      // ============================================
+      // Detectar alertas en signos vitales
       const alertas = [];
       let tiene_alerta = false;
       
@@ -319,10 +289,9 @@ router.get('/pacientes/recientes', async (req, res) => {
         }
       }
 
-      // Determinar fecha para mostrar
       const ultima_fecha = p.fecha_finalizacion || p.registro_creado_en;
 
-      console.log(`📊 [PROGRESO] ${p.nombre_completo}: ${progreso}% (${estado_real}) | Registro: ${p.estado_registro}`);
+      console.log(`📊 [PROGRESO] ${p.nombre_completo}: ${progreso}% (${estado_real})`);
 
       return {
         id: p.id,
@@ -334,14 +303,11 @@ router.get('/pacientes/recientes', async (req, res) => {
         progreso: progreso,
         alertas: alertas,
         tiene_alerta: tiene_alerta,
-        ultima_fecha: ultima_fecha,
-        // Información adicional para el frontend
-        tiene_plan: p.planes_activos > 0,
-        tiene_plan_completo: p.planes_completos > 0
+        ultima_fecha: ultima_fecha
       };
     });
 
-    console.log('👥 [PACIENTES] Encontrados:', pacientesProcesados.length);
+    console.log('✅ [PACIENTES] Procesados:', pacientesProcesados.length);
 
     return res.status(200).json({
       error: false,
@@ -349,7 +315,15 @@ router.get('/pacientes/recientes', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PACIENTES] Error:', err.message);
+    // ✅ Log detallado del error
+    console.error('❌ [PACIENTES] Error detallado:', {
+      message: err.message,
+      code: err.code,
+      sql: err.sql,
+      sqlMessage: err.sqlMessage,
+      parameters: { usuarioId, limit: limitNum }
+    });
+    
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al cargar pacientes: ' + err.message 
