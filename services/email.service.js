@@ -1,148 +1,152 @@
 // services/email.service.js
-const { Resend } = require('resend');
+// services/email.service.js
+const nodemailer = require('nodemailer');
 
-class EmailService {
-    constructor() {
-        this.resend = new Resend(process.env.EMAIL_API_KEY);
-        this.fromName = process.env.EMAIL_FROM_NAME || 'NutriPA';
-        this.fromAddress = process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev';
+// Configurar transporter de Gmail
+const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT) || 587,
+    secure: false, // true para 465, false para 587
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
+});
 
-    // 📧 Enviar código de recuperación
-    async sendRecoveryEmail(destinatario, nombreUsuario, codigo) {
-        try {
-            const { data, error } = await this.resend.emails.send({
-                from: `${this.fromName} <${this.fromAddress}>`,
-                to: destinatario,
-                subject: '🔐 Código de Verificación - NutriPA',
-                text: `Hola ${nombreUsuario}, tu código de verificación es: ${codigo}\n\nEste código expira en 15 minutos.\n\nSi no solicitaste este cambio, ignora este mensaje.`,
-                html: this._generarTemplateEmail(nombreUsuario, codigo)
-            });
+// Verificar conexión al iniciar
+transporter.verify()
+    .then(() => console.log('✅ [EMAIL] Servicio de correo configurado correctamente'))
+    .catch(err => console.error('❌ [EMAIL] Error configurando correo:', err.message));
 
-            if (error) {
-                console.error('❌ [RESEND] Error:', error);
-                throw new Error(error.message || 'No se pudo enviar el código');
-            }
-
-            console.log(`✅ [EMAIL] Enviado a ${destinatario} - ID: ${data?.id}`);
-            return { success: true, messageId: data?.id };
-
-        } catch (err) {
-            console.error('❌ [EMAIL] Error enviando recuperación:', err.message);
-            throw err;
-        }
-    }
-
-    // ✅ Enviar confirmación de contraseña actualizada
-    async sendPasswordUpdatedEmail(destinatario, nombreUsuario) {
-        try {
-            const { data, error } = await this.resend.emails.send({
-                from: `${this.fromName} <${this.fromAddress}>`,
-                to: destinatario,
-                subject: '✅ Contraseña Actualizada - NutriPA',
-                text: `Hola ${nombreUsuario}, tu contraseña ha sido actualizada exitosamente.\n\nSi no realizaste este cambio, contacta a soporte inmediatamente.`,
-                html: this._generarTemplateConfirmacion(nombreUsuario)
-            });
-
-            if (error) {
-                console.warn('⚠️ [EMAIL] No se pudo enviar confirmación:', error.message);
-                // No fallar el proceso principal por esto
-                return { success: false };
-            }
-
-            console.log(`✅ [EMAIL] Confirmación enviada a ${destinatario}`);
-            return { success: true };
-
-        } catch (err) {
-            console.warn('⚠️ [EMAIL] Error enviando confirmación:', err.message);
-            return { success: false };
-        }
-    }
-
-    // 🎨 Plantilla HTML para código de recuperación
-    _generarTemplateEmail(nombreUsuario, codigo) {
-        return `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recuperación de Contraseña - NutriPA</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f5f7fa; padding: 40px 20px;">
-        <tr>
-            <td align="center">
-                <table width="100%" max-width="600px" cellpadding="0" cellspacing="0" border="0" style="background: #ffffff; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); overflow: hidden;">
-                    <tr>
-                        <td style="background: linear-gradient(135deg, #6c7293 0%, #3d4468 100%); padding: 40px 32px; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">🔐 NutriPA</h1>
-                            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">Recuperación de Contraseña</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 40px 32px;">
-                            <p style="color: #3d4468; font-size: 16px; margin: 0 0 24px;">
-                                Hola <strong style="color: #6c7293;">${nombreUsuario}</strong>,
-                            </p>
-                            <p style="color: #6c7293; font-size: 15px; margin: 0 0 32px; line-height: 1.6;">
-                                Hemos recibido una solicitud para restablecer tu contraseña. Usa el siguiente código de verificación para continuar:
-                            </p>
-                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                    <td align="center">
-                                        <div style="background: linear-gradient(135deg, #e0e5ec 0%, #f5f7fa 100%); border-radius: 16px; padding: 24px 32px; text-align: center; border: 2px dashed #bec3cf;">
-                                            <span style="display: block; color: #3d4468; font-size: 32px; font-weight: 700; letter-spacing: 12px; margin: 0;">${codigo}</span>
-                                            <p style="color: #9499b7; font-size: 13px; margin: 12px 0 0;">⏱️ Este código expira en <strong>15 minutos</strong></p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
-                            <div style="margin-top: 32px; padding: 20px; background: #f8f9fc; border-radius: 12px;">
-                                <p style="color: #6c7293; font-size: 14px; margin: 0; line-height: 1.6;">
-                                    <strong>¿No solicitaste este cambio?</strong><br>
-                                    Si no fuiste tú, puedes ignorar este mensaje de forma segura.
-                                </p>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="background: #f8f9fc; padding: 24px 32px; text-align: center; border-top: 1px solid #e0e5ec;">
-                            <p style="color: #9499b7; font-size: 12px; margin: 0;">© 2024 NutriPA - Todos los derechos reservados</p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-    }
-
-    // 🎨 Plantilla HTML para confirmación
-    _generarTemplateConfirmacion(nombreUsuario) {
-        return `
+// ============================================
+// 📧 Enviar código de recuperación
+// ============================================
+async function sendRecoveryEmail(correo, nombre, codigo) {
+    const html = `
 <!DOCTYPE html>
 <html>
-<body style="font-family: sans-serif; padding: 20px; background: #f5f7fa;">
-    <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
-        <h2 style="color: #00c896; text-align: center;">✓ Contraseña Actualizada</h2>
-        <p>Hola <strong>${nombreUsuario}</strong>,</p>
-        <p>Tu contraseña de <strong>NutriPA</strong> ha sido actualizada exitosamente.</p>
-        <p style="color: #6c7293;"><strong>Fecha:</strong> ${new Date().toLocaleString('es-ES')}</p>
-        <hr style="border: none; border-top: 1px solid #e0e5ec; margin: 20px 0;">
-        <p style="color: #ff3b5c; font-size: 14px;">
-            ⚠️ <strong>¿No fuiste tú?</strong><br>
-            Si no realizaste este cambio, tu cuenta podría estar comprometida. 
-            Contacta a soporte inmediatamente.
-        </p>
-        <p style="color: #9499b7; font-size: 12px; text-align: center; margin-top: 30px;">
-            © 2024 NutriPA
-        </p>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7fb; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #0a4d68, #145da0); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header p { margin: 8px 0 0; opacity: 0.9; }
+        .content { padding: 30px; }
+        .greeting { font-size: 18px; color: #1a1f36; margin-bottom: 16px; }
+        .message { color: #6c7293; line-height: 1.6; margin-bottom: 24px; }
+        .code-box { background: #f4f7fb; border: 2px dashed #145da0; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0; }
+        .code { font-size: 36px; font-weight: 700; color: #0a4d68; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 8px; margin: 20px 0; color: #856404; font-size: 14px; }
+        .footer { background: #f8fafc; padding: 20px; text-align: center; color: #9499b7; font-size: 12px; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Recuperación de Contraseña</h1>
+            <p>NutriPA - Sistema Clínico Nutricional</p>
+        </div>
+        <div class="content">
+            <p class="greeting">Hola ${nombre},</p>
+            <p class="message">
+                Hemos recibido una solicitud para restablecer tu contraseña. 
+                Usa el siguiente código de verificación:
+            </p>
+            <div class="code-box">
+                <div class="code">${codigo}</div>
+            </div>
+            <div class="warning">
+                ⚠️ <strong>Importante:</strong> Este código expira en <strong>15 minutos</strong>. 
+                Si no solicitaste este cambio, ignora este correo.
+            </div>
+            <p class="message" style="font-size: 14px;">
+                Por seguridad, nunca compartas este código con nadie.
+            </p>
+        </div>
+        <div class="footer">
+            <p>Este correo fue enviado automáticamente por NutriPA.</p>
+            <p>© ${new Date().getFullYear()} NutriPA - Todos los derechos reservados</p>
+        </div>
     </div>
 </body>
-</html>`;
-    }
+</html>
+    `;
+
+    const mailOptions = {
+        from: `"${process.env.EMAIL_FROM_NAME || 'NutriPA'}" <${process.env.EMAIL_USER}>`,
+        to: correo,
+        subject: '🔐 Código de recuperación - NutriPA',
+        text: `Hola ${nombre}, tu código de recuperación es: ${codigo}\n\nEste código expira en 15 minutos.`,
+        html: html
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ [EMAIL] Correo enviado a ${correo} (ID: ${info.messageId})`);
+    return info;
 }
 
-module.exports = new EmailService();
+// ============================================
+// ✅ Enviar confirmación de cambio exitoso
+// ============================================
+async function sendPasswordUpdatedEmail(correo, nombre) {
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7fb; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px; }
+        .success-icon { font-size: 64px; text-align: center; margin: 20px 0; }
+        .message { color: #6c7293; line-height: 1.6; text-align: center; }
+        .warning { background: #fee2e2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 8px; margin: 20px 0; color: #991b1b; font-size: 14px; }
+        .footer { background: #f8fafc; padding: 20px; text-align: center; color: #9499b7; font-size: 12px; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Contraseña Actualizada</h1>
+        </div>
+        <div class="content">
+            <div class="success-icon">🎉</div>
+            <p class="message">
+                Hola <strong>${nombre}</strong>,<br><br>
+                Tu contraseña ha sido actualizada exitosamente.<br>
+                Ya puedes iniciar sesión con tu nueva contraseña.
+            </p>
+            <div class="warning">
+                🚨 <strong>¿No fuiste tú?</strong><br>
+                Si no realizaste este cambio, contacta inmediatamente a soporte y bloquea tu cuenta.
+            </div>
+        </div>
+        <div class="footer">
+            <p>© ${new Date().getFullYear()} NutriPA - Sistema Clínico Nutricional</p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const mailOptions = {
+        from: `"${process.env.EMAIL_FROM_NAME || 'NutriPA'}" <${process.env.EMAIL_USER}>`,
+        to: correo,
+        subject: '✅ Contraseña actualizada - NutriPA',
+        text: `Hola ${nombre}, tu contraseña ha sido actualizada exitosamente.`,
+        html: html
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ [EMAIL] Confirmación enviada a ${correo}`);
+}
+
+module.exports = {
+    sendRecoveryEmail,
+    sendPasswordUpdatedEmail,
+    transporter
+};
