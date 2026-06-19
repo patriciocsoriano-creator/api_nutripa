@@ -3,7 +3,7 @@
 # ============================================
 
 # Imagen oficial de Node.js
-FROM node:20-alpine
+FROM node:20-bookworm
 
 # Directorio de trabajo dentro del contenedor
 WORKDIR /app
