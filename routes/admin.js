@@ -247,6 +247,9 @@ router.delete('/usuarios/:id', async (req, res) => {
 // ========================================
 // 👨‍⚕️ MÉDICOS - LISTAR
 // ========================================
+// ========================================
+// 👨‍⚕️ MÉDICOS Y ENFERMERAS - LISTAR
+// ========================================
 router.get('/medicos', async (req, res) => {
   let connection;
   try {
@@ -261,12 +264,19 @@ router.get('/medicos', async (req, res) => {
          u.cedula, 
          u.telefono, 
          u.activo,
-         u.fecha_registro
+         u.fecha_registro,
+         r.nombre as rol
        FROM usuarios u
        INNER JOIN roles r ON u.rol_id = r.id
-       WHERE r.nombre IN ('doctor', 'nutricionista')
+       WHERE r.nombre IN ('doctor', 'nutricionista', 'enfermera')
          AND u.eliminado_en IS NULL
-       ORDER BY u.apellido ASC`
+       ORDER BY 
+         CASE r.nombre 
+           WHEN 'doctor' THEN 1 
+           WHEN 'nutricionista' THEN 2 
+           WHEN 'enfermera' THEN 3 
+         END,
+         u.apellido ASC`
     );
 
     return res.status(200).json({
