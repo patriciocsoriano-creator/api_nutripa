@@ -772,42 +772,115 @@ router.get('/configuracion/backup', async (req, res) => {
 // ========================================
 // EXPORTAR BASE DE DATOS
 // ========================================
+// ========================================
+// EXPORTAR BASE DE DATOS (con token en URL)
+// ========================================
 router.get('/configuracion/backup/exportar', async (req, res) => {
   let connection;
   try {
+    // Validar token manualmente desde query params
+    const token = req.query.token;
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: true, 
+        mensaje: 'Token no proporcionado. Use ?token=YOUR_TOKEN' 
+      });
+    }
+
+    // Verificar el token JWT manualmente
+    const jwt = require('jsonwebtoken');
+    let usuario;
+    
+    try {
+      usuario = jwt.verify(token, process.env.JWT_SECRET || 'nutripa_secret_key_2024');
+    } catch (err) {
+      return res.status(401).json({ 
+        error: true, 
+        mensaje: 'Token invalido o expirado' 
+      });
+    }
+
+    // Verificar que sea admin
+    if (usuario.rol !== 'admin') {
+      return res.status(403).json({ 
+        error: true, 
+        mensaje: 'Solo administradores pueden exportar la base de datos' 
+      });
+    }
+
+    console.log(`[ADMIN] Exportacion BD solicitada por: ${usuario.correo}`);
+
     connection = await getConnection();
 
     const [tablas] = await connection.execute(
       `SELECT TABLE_NAME FROM information_schema.TABLES 
-       WHERE TABLE_SCHEMA = 'nutripa_db'`
+       WHERE TABLE_SCHEMA = ?
+       ORDER BY TABLE_NAME`,
+      [process.env.DB_NAME || 'nutripa_db']
     );
 
-    let sqlContent = `-- Respaldo de NutriPA DB\n`;
-    sqlContent += `-- Fecha: ${new Date().toISOString()}\n\n`;
+    let sqlContent = `-- ========================================\n`;
+    sqlContent += `-- Respaldo de NutriPA DB\n`;
+    sqlContent += `-- Fecha: ${new Date().toISOString()}\n`;
+    sqlContent += `-- Solicitado por: ${usuario.correo}\n`;
+    sqlContent += `-- ========================================\n\n`;
+    sqlContent += `SET FOREIGN_KEY_CHECKS=0;\n\n`;
 
     for (const tabla of tablas) {
       const nombreTabla = tabla.TABLE_NAME;
       
-      // Obtener estructura
-      const [estructura] = await connection.execute(`SHOW CREATE TABLE ${nombreTabla}`);
-      sqlContent += `\n-- Tabla: ${nombreTabla}\n`;
-      sqlContent += `${estructura[0]['Create Table']};\n\n`;
-      
-      // Obtener datos
-      const [datos] = await connection.execute(`SELECT * FROM ${nombreTabla} LIMIT 1000`);
-      if (datos.length > 0) {
-        sqlContent += `-- Datos de ${nombreTabla}\n`;
-        // Aqui se generarian los INSERT
+      try {
+        // Obtener estructura
+        const [estructura] = await connection.execute(`SHOW CREATE TABLE \`${nombreTabla}\``);
+        sqlContent += `\n-- ========================================\n`;
+        sqlContent += `-- Tabla: ${nombreTabla}\n`;
+        sqlContent += `-- ========================================\n`;
+        sqlContent += `DROP TABLE IF EXISTS \`${nombreTabla}\`;\n`;
+        sqlContent += `${estructura[0]['Create Table']};\n\n`;
+        
+        // Obtener datos
+        const [datos] = await connection.execute(`SELECT * FROM \`${nombreTabla}\` LIMIT 10000`);
+        
+        if (datos.length > 0) {
+          sqlContent += `-- Datos de ${nombreTabla} (${datos.length} filas)\n`;
+          
+          for (const fila of datos) {
+            const columnas = Object.keys(fila);
+            const valores = columnas.map(col => {
+              const val = fila[col];
+              if (val === null) return 'NULL';
+              if (typeof val === 'number') return val;
+              if (val instanceof Date) return `'${val.toISOString().slice(0, 19).replace('T', ' ')}'`;
+              return `'${String(val).replace(/'/g, "''")}'`;
+            });
+            
+            sqlContent += `INSERT INTO \`${nombreTabla}\` (\`${columnas.join('`, `')}\`) VALUES (${valores.join(', ')});\n`;
+          }
+          sqlContent += `\n`;
+        }
+      } catch (err) {
+        sqlContent += `-- Error al exportar tabla ${nombreTabla}: ${err.message}\n\n`;
       }
     }
 
+    sqlContent += `\nSET FOREIGN_KEY_CHECKS=1;\n`;
+    sqlContent += `-- ========================================\n`;
+    sqlContent += `-- Fin del respaldo\n`;
+    sqlContent += `-- ========================================\n`;
+
+    const nombreArchivo = `nutripa_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.sql`;
+    
     res.setHeader('Content-Type', 'application/sql');
-    res.setHeader('Content-Disposition', `attachment; filename=nutripa_backup_${Date.now()}.sql`);
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+    res.setHeader('Content-Length', Buffer.byteLength(sqlContent, 'utf8'));
     res.send(sqlContent);
+
+    console.log(`[ADMIN] Exportacion completada: ${nombreArchivo} (${tablas.length} tablas)`);
 
   } catch (err) {
     console.error('[ADMIN] Error exportando BD:', err.message);
-    return res.status(500).json({ error: true, mensaje: 'Error al exportar BD' });
+    return res.status(500).json({ error: true, mensaje: 'Error al exportar BD: ' + err.message });
   } finally {
     if (connection) try { connection.release(); } catch (e) {}
   }
