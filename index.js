@@ -1,35 +1,35 @@
-// index.js - VERSIÓN FINAL CON PANEL DE ADMINISTRACIÓN
+// index.js - VERSION FINAL CON PANEL DE ADMINISTRACION
 
-//  CONFIGURACIÓN DNS PARA NODE.JS (CRÍTICO PARA WINDOWS)
+// CONFIGURACION DNS PARA NODE.JS (CRITICO PARA WINDOWS)
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
-//  FIN CONFIGURACIÓN DNS
+// FIN CONFIGURACION DNS
 
 require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
 
-//  Conexión a BD
+// Conexion a BD
 const { app, closePool } = require('./conexion');
 
-console.log(' [INDEX] Montando rutas...');
+console.log('[INDEX] Montando rutas...');
 
 // ========================================
-//  AUTENTICACIÓN Y REGISTRO
+// AUTENTICACION Y REGISTRO
 // ========================================
 app.use('/nutricionapp-api/login', require('./routes/login'));
 app.use('/nutricionapp-api/registro', require('./routes/registro'));
 app.use('/nutricionapp-api/recuperar', require('./routes/recuperar'));
 
 // ========================================
-//  ENFERMERÍA
+// ENFERMERIA
 // ========================================
 app.use('/nutricionapp-api/enfermeria/registro', require('./routes/enfermeriaregistro'));
 app.use('/nutricionapp-api/enfermeria', require('./routes/enfermeria-panel'));
 
 // ========================================
-//  MÉDICO (ORDEN IMPORTANTE: Específico antes que general)
+// MEDICO (ORDEN IMPORTANTE: Especifico antes que general)
 // ========================================
 app.use('/nutricionapp-api/medico/dashboard', require('./routes/medico-dashboard'));
 app.use('/nutricionapp-api/medico/paciente', require('./routes/medico-paciente-detalle'));
@@ -37,6 +37,7 @@ app.use('/nutricionapp-api/medico/pacientes', require('./routes/verpacientes'));
 app.use('/nutricionapp-api/medico/plan-nutricional', require('./routes/medico-plan-nutricional'));
 app.use('/nutricionapp-api/medico/seguimiento', require('./routes/medico-seguimiento-clinico'));
 app.use('/nutricionapp-api/medico/informes', require('./routes/medicoinformes'));
+app.use('/nutricionapp-api/medico/perfil', require('./routes/medico-perfil'));
 
 // ========================================
 // APIs EXTERNAS
@@ -44,28 +45,28 @@ app.use('/nutricionapp-api/medico/informes', require('./routes/medicoinformes'))
 app.use('/nutricionapp-api/fatsecret', require('./routes/fatsecret'));
 
 // ========================================
-//  PACIENTE
+// PACIENTE
 // ========================================
 app.use('/nutricionapp-api/paciente/vincular', require('./routes/pacientevincular'));
 app.use('/nutricionapp-api/paciente/plan', require('./routes/paciente-plan'));
 app.use('/nutricionapp-api/paciente/glucosa', require('./routes/paciente-glucosa'));
 
 // ========================================
-//  ADMINISTRADOR (ORDEN CRÍTICO)
+// ADMINISTRADOR (ORDEN CRITICO)
 // ========================================
-//  Ubicaciones geográficas (DEBE IR PRIMERO por ser más específica)
+// Ubicaciones geograficas (DEBE IR PRIMERO por ser mas especifica)
 app.use('/nutricionapp-api/admin/ubicaciones', require('./routes/admin-ubicaciones'));
 
-//  Panel de administración completo
+// Panel de administracion completo
 app.use('/nutricionapp-api/admin', require('./routes/admin'));
 
 // ========================================
-//  INTELIGENCIA ARTIFICIAL
+// INTELIGENCIA ARTIFICIAL
 // ========================================
 app.use('/nutricionapp-api/api/ml', require('./routes/ml-proxy'));
 
 // ========================================
-//  HEALTH CHECK
+// HEALTH CHECK
 // ========================================
 app.get('/nutricionapp-api/health', (req, res) => {
   res.json({ 
@@ -77,10 +78,10 @@ app.get('/nutricionapp-api/health', (req, res) => {
 });
 
 // ========================================
-//  404 HANDLER
+// 404 HANDLER
 // ========================================
 app.use((req, res) => {
-  console.warn(' [404] Ruta no encontrada:', req.method, req.path);
+  console.warn('[404] Ruta no encontrada:', req.method, req.path);
   res.status(404).json({ 
     error: true, 
     mensaje: 'Ruta no encontrada', 
@@ -90,10 +91,10 @@ app.use((req, res) => {
 });
 
 // ========================================
-//  ERROR GLOBAL
+// ERROR GLOBAL
 // ========================================
 app.use((err, req, res, next) => {
-  console.error(' [ERROR GLOBAL]', {
+  console.error('[ERROR GLOBAL]', {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     path: req.path,
@@ -107,56 +108,62 @@ app.use((err, req, res, next) => {
 });
 
 // ========================================
-//  CIERRE LIMPIO
+// CIERRE LIMPIO
 // ========================================
 process.on('SIGINT', async () => { 
-  console.log(' Cerrando servidor (SIGINT)...');
+  console.log('[SERVER] Cerrando servidor (SIGINT)...');
   await closePool(); 
   process.exit(0); 
 });
 process.on('SIGTERM', async () => { 
-  console.log(' Cerrando servidor (SIGTERM)...');
+  console.log('[SERVER] Cerrando servidor (SIGTERM)...');
   await closePool(); 
   process.exit(0); 
 });
 
 // ========================================
-//  INICIAR SERVIDOR
+// INICIAR SERVIDOR
 // ========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(` API corriendo en http://localhost:${PORT}`);
-  console.log(` BD: ${process.env.DB_NAME || 'nutripa_db'}@${process.env.DB_HOST || '127.0.0.1'}`);
-  console.log(`\n RUTAS DISPONIBLES:`);
-  console.log(`    Autenticación:`);
-  console.log(`      • POST /nutricionapp-api/login`);
-  console.log(`      • POST /nutricionapp-api/registro`);
-  console.log(`      • POST /nutricionapp-api/recuperar/...`);
-  console.log(`    Enfermería:`);
-  console.log(`      • GET  /nutricionapp-api/enfermeria/...`);
-  console.log(`    Médico:`);
-  console.log(`      • GET  /nutricionapp-api/medico/pacientes`);
-  console.log(`      • GET  /nutricionapp-api/medico/paciente/:id/detalle`);
-  console.log(`      • POST /nutricionapp-api/medico/plan-nutricional`);
-  console.log(`    Administrador:`);
-  console.log(`      • GET  /nutricionapp-api/admin/dashboard/stats`);
-  console.log(`      • GET  /nutricionapp-api/admin/usuarios`);
-  console.log(`      • GET  /nutricionapp-api/admin/medicos`);
-  console.log(`      • GET  /nutricionapp-api/admin/pacientes`);
-  console.log(`      • GET  /nutricionapp-api/admin/asignaciones`);
-  console.log(`      • GET  /nutricionapp-api/admin/auditoria`);
-  console.log(`      • GET  /nutricionapp-api/admin/reportes/globales`);
-  console.log(`    Ubicaciones:`);
-  console.log(`      • POST /nutricionapp-api/admin/ubicaciones/poblar`);
-  console.log(`      • GET  /nutricionapp-api/admin/ubicaciones/stats`);
-  console.log(`      • GET  /nutricionapp-api/admin/ubicaciones/provincias`);
-  console.log(`      • GET  /nutricionapp-api/admin/ubicaciones/cantones/:codigo`);
-  console.log(`      • GET  /nutricionapp-api/admin/ubicaciones/parroquias/:codigo`);
-  console.log(`    IA:`);
-  console.log(`      • POST /nutricionapp-api/api/ml/prediccion-perfil`);
-  console.log(`    Externas:`);
-  console.log(`      • POST /nutricionapp-api/fatsecret/search`);
-  console.log(`    Salud:`);
-  console.log(`      • GET  /nutricionapp-api/health`);
-  console.log(`\n Tip: Usa dns.setDefaultResultOrder('ipv4first') para evitar ENOTFOUND en Windows`);
+  console.log(`[SERVER] API corriendo en http://localhost:${PORT}`);
+  console.log(`[SERVER] BD: ${process.env.DB_NAME || 'nutripa_db'}@${process.env.DB_HOST || '127.0.0.1'}`);
+  console.log(`\n[SERVER] RUTAS DISPONIBLES:`);
+  console.log(`  Autenticacion:`);
+  console.log(`    - POST /nutricionapp-api/login`);
+  console.log(`    - POST /nutricionapp-api/registro`);
+  console.log(`    - POST /nutricionapp-api/recuperar/...`);
+  console.log(`  Enfermeria:`);
+  console.log(`    - GET  /nutricionapp-api/enfermeria/...`);
+  console.log(`  Medico:`);
+  console.log(`    - GET  /nutricionapp-api/medico/dashboard`);
+  console.log(`    - GET  /nutricionapp-api/medico/pacientes`);
+  console.log(`    - GET  /nutricionapp-api/medico/paciente/:id/detalle`);
+  console.log(`    - POST /nutricionapp-api/medico/plan-nutricional`);
+  console.log(`    - GET  /nutricionapp-api/medico/perfil`);
+  console.log(`    - PUT  /nutricionapp-api/medico/perfil`);
+  console.log(`    - PUT  /nutricionapp-api/medico/ubicacion`);
+  console.log(`    - PUT  /nutricionapp-api/medico/correo`);
+  console.log(`    - PUT  /nutricionapp-api/medico/password`);
+  console.log(`  Administrador:`);
+  console.log(`    - GET  /nutricionapp-api/admin/dashboard/stats`);
+  console.log(`    - GET  /nutricionapp-api/admin/usuarios`);
+  console.log(`    - GET  /nutricionapp-api/admin/medicos`);
+  console.log(`    - GET  /nutricionapp-api/admin/pacientes`);
+  console.log(`    - GET  /nutricionapp-api/admin/asignaciones`);
+  console.log(`    - GET  /nutricionapp-api/admin/auditoria`);
+  console.log(`    - GET  /nutricionapp-api/admin/reportes/globales`);
+  console.log(`  Ubicaciones:`);
+  console.log(`    - POST /nutricionapp-api/admin/ubicaciones/poblar`);
+  console.log(`    - GET  /nutricionapp-api/admin/ubicaciones/stats`);
+  console.log(`    - GET  /nutricionapp-api/admin/ubicaciones/provincias`);
+  console.log(`    - GET  /nutricionapp-api/admin/ubicaciones/cantones/:codigo`);
+  console.log(`    - GET  /nutricionapp-api/admin/ubicaciones/parroquias/:codigo`);
+  console.log(`  IA:`);
+  console.log(`    - POST /nutricionapp-api/api/ml/prediccion-perfil`);
+  console.log(`  Externas:`);
+  console.log(`    - POST /nutricionapp-api/fatsecret/search`);
+  console.log(`  Salud:`);
+  console.log(`    - GET  /nutricionapp-api/health`);
+  console.log(`\n[SERVER] Tip: Usa dns.setDefaultResultOrder('ipv4first') para evitar ENOTFOUND en Windows`);
 });
