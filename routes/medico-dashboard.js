@@ -4,13 +4,13 @@ const router = express.Router();
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando medico-dashboard.js');
+console.log(' [ROUTER] Cargando medico-dashboard.js');
 
 // ============================================================================
-// 📊 GET /nutricionapp-api/medico/dashboard
-// 👉 Dashboard completo con estadísticas reales
+//  GET /nutricionapp-api/medico/dashboard
+//  Dashboard completo con estadísticas reales
 // ============================================================================
-// ⚠️ IMPORTANTE: Como en index.js ya se monta con prefijo '/dashboard',
+//  IMPORTANTE: Como en index.js ya se monta con prefijo '/dashboard',
 // aquí la ruta debe ser solo '/'
 router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (req, res) => {
   const medicoId = req.usuario?.id;
@@ -24,7 +24,7 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
     connection = await getConnection();
 
     // ==========================================
-    // 1️⃣ TOTAL DE PACIENTES ACTIVOS
+    //  TOTAL DE PACIENTES ACTIVOS
     // ==========================================
     const [pacientesResult] = await connection.execute(
       `SELECT COUNT(*) as total 
@@ -34,7 +34,7 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
     const totalPacientes = pacientesResult[0]?.total || 0;
 
     // ==========================================
-    // 2️⃣ PLANES CREADOS POR EL MÉDICO/NUTRICIONISTA
+    //  PLANES CREADOS POR EL MÉDICO/NUTRICIONISTA
     // ==========================================
     const [planesResult] = await connection.execute(
       `SELECT COUNT(*) as total 
@@ -46,7 +46,7 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
     const planesCreados = planesResult[0]?.total || 0;
 
     // ==========================================
-    // 3️⃣ CONTROLES REALIZADOS (Registros finalizados)
+    //  CONTROLES REALIZADOS (Registros finalizados)
     // ==========================================
     const [controlesResult] = await connection.execute(
       `SELECT COUNT(*) as total 
@@ -57,7 +57,7 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
     const controlesRealizados = controlesResult[0]?.total || 0;
 
     // ==========================================
-    // 4️⃣ ALERTAS ACTIVAS (Presión arterial alta)
+    //  ALERTAS ACTIVAS (Presión arterial alta)
     // ==========================================
     const [registrosRecientes] = await connection.execute(
       `SELECT 
@@ -105,12 +105,12 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
           }
         }
       } catch (e) {
-        console.warn('⚠️ Error parseando signos vitales:', e.message);
+        console.warn(' Error parseando signos vitales:', e.message);
       }
     }
 
     // ==========================================
-    // 5️⃣ PACIENTES RECIENTES (últimos 5)
+    //  PACIENTES RECIENTES (últimos 5)
     // ==========================================
     const [pacientesRecientes] = await connection.execute(
       `SELECT 
@@ -183,9 +183,9 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
     });
 
     // ==========================================
-    // 📤 RESPUESTA FINAL
+    //  RESPUESTA FINAL
     // ==========================================
-    console.log(`✅ [DASHBOARD] Datos cargados para médico ${medicoId}`);
+    console.log(` [DASHBOARD] Datos cargados para médico ${medicoId}`);
     
     return res.status(200).json({
       error: false,
@@ -200,7 +200,7 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
     });
 
   } catch (err) {
-    console.error('❌ [DASHBOARD] Error:', err);
+    console.error(' [DASHBOARD] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al cargar el dashboard' 
@@ -212,5 +212,5 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista'), async (
   }
 });
 
-console.log('✅ [ROUTER] medico-dashboard.js cargado correctamente');
+console.log(' [ROUTER] medico-dashboard.js cargado correctamente');
 module.exports = router;

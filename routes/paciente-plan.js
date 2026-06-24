@@ -4,15 +4,15 @@ const router = express.Router();
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando paciente-plan.js');
+console.log(' [ROUTER] Cargando paciente-plan.js');
 
 // Middleware: solo pacientes autenticados
 router.use(verificarToken);
 router.use(verificarRol('paciente'));
 
 // ============================================================================
-// 🔍 FUNCIÓN HELPER: Obtener paciente_id del usuario logueado
-// ✅ CORREGIDO: Buscar en tabla pacientes por usuario_id
+//  FUNCIÓN HELPER: Obtener paciente_id del usuario logueado
+//  CORREGIDO: Buscar en tabla pacientes por usuario_id
 // ============================================================================
 async function obtenerPacienteId(usuarioId, connection) {
   const [paciente] = await connection.execute(
@@ -44,8 +44,8 @@ async function obtenerPacienteId(usuarioId, connection) {
 }
 
 // ============================================================================
-// 🥗 GET /nutricionapp-api/paciente/plan/plan-activo
-// ✅ Obtener el plan nutricional activo del paciente
+//  GET /nutricionapp-api/paciente/plan/plan-activo
+//  Obtener el plan nutricional activo del paciente
 // ============================================================================
 router.get('/plan-activo', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -58,11 +58,11 @@ router.get('/plan-activo', async (req, res) => {
   try {
     connection = await getConnection();
     
-    // ✅ Obtener el paciente_id correctamente
+    //  Obtener el paciente_id correctamente
     const pacienteId = await obtenerPacienteId(usuarioId, connection);
     
     if (!pacienteId) {
-      console.log(`⚠️ [PACIENTE] No se encontró paciente vinculado al usuario ${usuarioId}`);
+      console.log(` [PACIENTE] No se encontró paciente vinculado al usuario ${usuarioId}`);
       return res.status(200).json({
         error: false,
         plan: null,
@@ -70,7 +70,7 @@ router.get('/plan-activo', async (req, res) => {
       });
     }
 
-    console.log(`🔍 [PACIENTE] Buscando plan para paciente_id: ${pacienteId}`);
+    console.log(` [PACIENTE] Buscando plan para paciente_id: ${pacienteId}`);
 
     // Buscar el plan más reciente y activo
     const [planes] = await connection.execute(
@@ -101,7 +101,7 @@ router.get('/plan-activo', async (req, res) => {
     );
 
     if (planes.length === 0) {
-      console.log(`ℹ️ [PACIENTE] No hay plan activo para paciente ${pacienteId}`);
+      console.log(` [PACIENTE] No hay plan activo para paciente ${pacienteId}`);
       return res.status(200).json({
         error: false,
         plan: null,
@@ -110,7 +110,7 @@ router.get('/plan-activo', async (req, res) => {
     }
 
     const plan = planes[0];
-    console.log(`✅ [PACIENTE] Plan encontrado: ${plan.id}`);
+    console.log(` [PACIENTE] Plan encontrado: ${plan.id}`);
 
     // Parsear campos JSON
     const planParseado = {
@@ -138,7 +138,7 @@ router.get('/plan-activo', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PACIENTE] Error obteniendo plan:', err);
+    console.error(' [PACIENTE] Error obteniendo plan:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener el plan nutricional: ' + err.message 
@@ -151,8 +151,8 @@ router.get('/plan-activo', async (req, res) => {
 });
 
 // ============================================================================
-// 📊 GET /nutricionapp-api/paciente/plan/ultimo-registro
-// ✅ Obtener el último registro clínico del paciente
+//  GET /nutricionapp-api/paciente/plan/ultimo-registro
+//  Obtener el último registro clínico del paciente
 // ============================================================================
 router.get('/ultimo-registro', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -205,7 +205,7 @@ router.get('/ultimo-registro', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PACIENTE] Error obteniendo último registro:', err);
+    console.error(' [PACIENTE] Error obteniendo último registro:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener el registro' 
@@ -218,8 +218,8 @@ router.get('/ultimo-registro', async (req, res) => {
 });
 
 // ============================================================================
-// 📅 GET /nutricionapp-api/paciente/plan/proxima-cita
-// ✅ Obtener la próxima cita del paciente
+//  GET /nutricionapp-api/paciente/plan/proxima-cita
+//  Obtener la próxima cita del paciente
 // ============================================================================
 router.get('/proxima-cita', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -263,7 +263,7 @@ router.get('/proxima-cita', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PACIENTE] Error obteniendo próxima cita:', err);
+    console.error(' [PACIENTE] Error obteniendo próxima cita:', err);
     // Si la tabla no existe, devolver null sin error
     return res.status(200).json({ error: false, cita: null });
   } finally {
@@ -274,8 +274,8 @@ router.get('/proxima-cita', async (req, res) => {
 });
 
 // ============================================================================
-// 📜 GET /nutricionapp-api/paciente/plan/historial
-// ✅ Obtener historial de planes del paciente
+// GET /nutricionapp-api/paciente/plan/historial
+//  Obtener historial de planes del paciente
 // ============================================================================
 router.get('/historial', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -313,7 +313,7 @@ router.get('/historial', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PACIENTE] Error obteniendo historial:', err);
+    console.error(' [PACIENTE] Error obteniendo historial:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener historial' 
@@ -327,8 +327,8 @@ router.get('/historial', async (req, res) => {
 
 
 // ============================================================================
-// 📜 GET /nutricionapp-api/paciente/plan/historial
-// 👉 Obtener historial de planes del paciente autenticado
+//  GET /nutricionapp-api/paciente/plan/historial
+// Obtener historial de planes del paciente autenticado
 // ============================================================================
 router.get('/historial', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -390,7 +390,7 @@ router.get('/historial', async (req, res) => {
       confianza_ia: plan.confianza_ia ? parseFloat(plan.confianza_ia) : null
     }));
 
-    console.log(`📋 [HISTORIAL] ${planesParseados.length} planes encontrados para paciente ${pacienteId}`);
+    console.log(` [HISTORIAL] ${planesParseados.length} planes encontrados para paciente ${pacienteId}`);
 
     return res.status(200).json({
       error: false,
@@ -403,7 +403,7 @@ router.get('/historial', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [HISTORIAL] Error obteniendo historial:', err);
+    console.error(' [HISTORIAL] Error obteniendo historial:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener el historial de planes' 
@@ -416,8 +416,8 @@ router.get('/historial', async (req, res) => {
 });
 
 // ============================================================================
-// 📏 GET /nutricionapp-api/paciente/datos-antropometricos
-// 👉 Obtener datos antropométricos y signos vitales del paciente
+//  GET /nutricionapp-api/paciente/datos-antropometricos
+//  Obtener datos antropométricos y signos vitales del paciente
 // ============================================================================
 router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -490,7 +490,7 @@ router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), a
         datosPersonales = JSON.parse(registro.datos_personales);
       }
     } catch (e) {
-      console.warn('⚠️ Error parseando JSONs:', e.message);
+      console.warn(' Error parseando JSONs:', e.message);
     }
 
     // Obtener historial de mediciones (últimos 5 registros)
@@ -531,7 +531,7 @@ router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), a
       };
     });
 
-    console.log(`📏 [DATOS] Datos antropométricos cargados para paciente ${pacienteId}`);
+    console.log(` [DATOS] Datos antropométricos cargados para paciente ${pacienteId}`);
 
     return res.status(200).json({
       error: false,
@@ -546,7 +546,7 @@ router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), a
     });
 
   } catch (err) {
-    console.error('❌ [DATOS] Error:', err);
+    console.error(' [DATOS] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener datos antropométricos' 
@@ -558,5 +558,5 @@ router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), a
   }
 });
 
-console.log('✅ [ROUTER] paciente-plan.js cargado correctamente');
+console.log(' [ROUTER] paciente-plan.js cargado correctamente');
 module.exports = router;

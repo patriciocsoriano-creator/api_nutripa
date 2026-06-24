@@ -47,11 +47,11 @@ const FOUNDATION_NUTRIENT_MAP = {
 
 async function main() {
 
-  console.log('🚀 Iniciando importación USDA clínica...\n');
+  console.log(' Iniciando importación USDA clínica...\n');
 
   if (fs.existsSync(DB_PATH)) {
     fs.unlinkSync(DB_PATH);
-    console.log('🗑️ DB anterior eliminada');
+    console.log(' DB anterior eliminada');
   }
 
   const db = new Database(DB_PATH);
@@ -82,13 +82,13 @@ async function main() {
     ON food_nutrients(fdc_id);
   `);
 
-  console.log('✅ Tablas creadas\n');
+  console.log(' Tablas creadas\n');
 
   // ==================================================
   // FOUNDATION IDS REALES
   // ==================================================
 
-  console.log('📥 Leyendo foundation_food.csv...');
+  console.log(' Leyendo foundation_food.csv...');
 
   const foundationIds = new Set();
 
@@ -116,14 +116,14 @@ async function main() {
   });
 
   console.log(
-    `✅ Foundation Foods reales: ${foundationIds.size}\n`
+    ` Foundation Foods reales: ${foundationIds.size}\n`
   );
 
   // ==================================================
   // SR LEGACY
   // ==================================================
 
-  console.log('📚 Importando SR Legacy...');
+  console.log(' Importando SR Legacy...');
 
   await importCSVSimple(
     db,
@@ -195,13 +195,13 @@ async function main() {
     }
   );
 
-  console.log('✅ SR Legacy importado\n');
+  console.log(' SR Legacy importado\n');
 
   // ==================================================
   // FOUNDATION REAL
   // ==================================================
 
-  console.log('🏛️ Importando Foundation Foods reales...');
+  console.log(' Importando Foundation Foods reales...');
 
   await importCSVSimple(
     db,
@@ -290,7 +290,7 @@ async function main() {
   );
 
   console.log(
-    '✅ Foundation Foods reales importados\n'
+    ' Foundation Foods reales importados\n'
   );
 
   // ==================================================
@@ -298,7 +298,7 @@ async function main() {
   // ==================================================
 
   console.log(
-    '🧹 Eliminando alimentos sin nutrientes...'
+    ' Eliminando alimentos sin nutrientes...'
   );
 
   const deleted =
@@ -311,7 +311,7 @@ async function main() {
     `).run();
 
   console.log(
-    `✅ Eliminados: ${deleted.changes}`
+    ` Eliminados: ${deleted.changes}`
   );
 
   // ==================================================
@@ -344,31 +344,31 @@ async function main() {
       FROM food_nutrients
     `).get().count;
 
-  console.log('\n📊 ESTADÍSTICAS FINALES');
+  console.log('\n ESTADÍSTICAS FINALES');
   console.log('=======================');
 
   console.log(
-    `🍎 Total alimentos: ${totalFoods.toLocaleString()}`
+    ` Total alimentos: ${totalFoods.toLocaleString()}`
   );
 
   console.log(
-    `📚 SR Legacy: ${srLegacyCount.toLocaleString()}`
+    ` SR Legacy: ${srLegacyCount.toLocaleString()}`
   );
 
   console.log(
-    `🏛️ Foundation: ${foundationCount.toLocaleString()}`
+    ` Foundation: ${foundationCount.toLocaleString()}`
   );
 
   console.log(
-    `🔬 Nutrientes: ${nutrientCount.toLocaleString()}`
+    ` Nutrientes: ${nutrientCount.toLocaleString()}`
   );
 
   console.log(
-    `\n💾 DB: ${DB_PATH}`
+    `\n DB: ${DB_PATH}`
   );
 
   console.log(
-    `📦 Tamaño: ${
+    ` Tamaño: ${
       (
         fs.statSync(DB_PATH).size /
         1024 /
@@ -380,7 +380,7 @@ async function main() {
   db.close();
 
   console.log(
-    '\n✅ Base clínica creada correctamente'
+    '\n Base clínica creada correctamente'
   );
 }
 

@@ -30,7 +30,7 @@ router.get('/', verificarToken, verificarRol('doctor', 'nutricionista', 'admin')
       }))
     });
   } catch (err) {
-    console.error('❌ Error obteniendo pacientes:', err.message);
+    console.error(' Error obteniendo pacientes:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error al cargar pacientes desde la BD' });
   } finally {
     if (connection) await connection.release();
@@ -54,11 +54,11 @@ router.delete('/:paciente_id', verificarToken, verificarRol('doctor', 'nutricion
       return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
     }
     
-    console.log('✅ [PACIENTE] Eliminado (soft delete):', paciente_id);
+    console.log(' [PACIENTE] Eliminado (soft delete):', paciente_id);
     return res.json({ error: false, mensaje: 'Paciente eliminado correctamente' });
     
   } catch (err) {
-    console.error('❌ [PACIENTE] Error eliminando:', err.message);
+    console.error(' [PACIENTE] Error eliminando:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error al eliminar paciente' });
   } finally {
     connection.release();

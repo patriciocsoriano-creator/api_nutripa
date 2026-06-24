@@ -5,15 +5,12 @@ const { v4: uuidv4 } = require('uuid');
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando medico-plan-nutricional.js');
+console.log(' [ROUTER] Cargando medico-plan-nutricional.js');
+
+
 
 // ============================================================================
-// ⚠️ IMPORTANTE: Las rutas ESPECÍFICAS van PRIMERO
-// ⚠️ Las rutas con parámetros (/:id) van DESPUÉS
-// ============================================================================
-
-// ============================================================================
-// 📋 LISTAR PLANES NUTRICIONALES DEL MÉDICO (RUTA ESPECÍFICA - VA PRIMERO)
+//  LISTAR PLANES NUTRICIONALES DEL MÉDICO (RUTA ESPECÍFICA - VA PRIMERO)
 // GET /nutricionapp-api/medico/plan-nutricional/planes
 // ============================================================================
 router.get('/planes', verificarToken, verificarRol('doctor', 'nutricionista'), async (req, res) => {
@@ -53,7 +50,7 @@ router.get('/planes', verificarToken, verificarRol('doctor', 'nutricionista'), a
             [medicoId]
         );
 
-        console.log(`✅ [PLANES] ${planes.length} planes encontrados para médico ${medicoId}`);
+        console.log(` [PLANES] ${planes.length} planes encontrados para médico ${medicoId}`);
 
         return res.status(200).json({
             error: false,
@@ -62,7 +59,7 @@ router.get('/planes', verificarToken, verificarRol('doctor', 'nutricionista'), a
         });
 
     } catch (err) {
-        console.error('❌ [PLANES] Error listando planes:', err);
+        console.error(' [PLANES] Error listando planes:', err);
         return res.status(500).json({ 
             error: true, 
             mensaje: 'Error al listar planes nutricionales' 
@@ -75,7 +72,7 @@ router.get('/planes', verificarToken, verificarRol('doctor', 'nutricionista'), a
 });
 
 // ============================================================================
-// 📋 LISTAR PLANES DE UN PACIENTE ESPECÍFICO
+//  LISTAR PLANES DE UN PACIENTE ESPECÍFICO
 // GET /nutricionapp-api/medico/plan-nutricional/paciente/:paciente_id
 // ============================================================================
 router.get('/paciente/:paciente_id', verificarToken, verificarRol('doctor', 'nutricionista', 'paciente'), async (req, res) => {
@@ -110,7 +107,7 @@ router.get('/paciente/:paciente_id', verificarToken, verificarRol('doctor', 'nut
     return res.json({ error: false, total: planes.length, planes });
 
   } catch (err) {
-    console.error('❌ [PLAN] Error listando planes:', err.message);
+    console.error(' [PLAN] Error listando planes:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error al listar planes' });
   } finally {
     if (connection) { try { connection.release(); } catch (e) {} }
@@ -118,7 +115,7 @@ router.get('/paciente/:paciente_id', verificarToken, verificarRol('doctor', 'nut
 });
 
 // ============================================================================
-// 🔍 OBTENER UN PLAN POR ID (RUTA CON PARÁMETRO - VA DESPUÉS)
+//  OBTENER UN PLAN POR ID (RUTA CON PARÁMETRO - VA DESPUÉS)
 // GET /nutricionapp-api/medico/plan-nutricional/:plan_id
 // ============================================================================
 router.get('/:plan_id', verificarToken, verificarRol('doctor', 'nutricionista', 'paciente'), async (req, res) => {
@@ -173,7 +170,7 @@ router.get('/:plan_id', verificarToken, verificarRol('doctor', 'nutricionista', 
     return res.json({ error: false, plan: planParseado });
 
   } catch (err) {
-    console.error('❌ [PLAN] Error obteniendo plan:', err.message);
+    console.error(' [PLAN] Error obteniendo plan:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error al cargar el plan: ' + err.message });
   } finally {
     if (connection) { try { connection.release(); } catch (e) {} }
@@ -273,7 +270,7 @@ router.post('/', verificarToken, verificarRol('doctor', 'nutricionista'), async 
       ]
     );
 
-    console.log('✅ [PLAN] Plan creado:', { planId, paciente_id, perfil_recomendado });
+    console.log(' [PLAN] Plan creado:', { planId, paciente_id, perfil_recomendado });
 
     return res.json({
       error: false,
@@ -288,7 +285,7 @@ router.post('/', verificarToken, verificarRol('doctor', 'nutricionista'), async 
     });
 
   } catch (err) {
-    console.error('❌ [PLAN] Error creando plan:', err.message);
+    console.error(' [PLAN] Error creando plan:', err.message);
     return res.status(500).json({
       error: true,
       mensaje: 'Error al crear el plan: ' + err.message,
@@ -338,7 +335,7 @@ router.put('/:plan_id/detallado', verificarToken, verificarRol('doctor', 'nutric
       [JSON.stringify(plan_detallado), plan_id]
     );
 
-    console.log('✅ [PLAN DETALLADO] Actualizado:', { 
+    console.log(' [PLAN DETALLADO] Actualizado:', { 
       plan_id, 
       paciente_id: plan[0].paciente_id,
       tiene_alimentos: !!plan_detallado?.weekly?.days?.[0]?.meals?.[0]?.foods?.[0]
@@ -351,7 +348,7 @@ router.put('/:plan_id/detallado', verificarToken, verificarRol('doctor', 'nutric
     });
 
   } catch (err) {
-    console.error('❌ [PLAN DETALLADO] Error actualizando:', err.message);
+    console.error(' [PLAN DETALLADO] Error actualizando:', err.message);
     return res.status(500).json({
       error: true,
       mensaje: 'Error al actualizar el plan detallado: ' + err.message
@@ -361,5 +358,5 @@ router.put('/:plan_id/detallado', verificarToken, verificarRol('doctor', 'nutric
   }
 });
 
-console.log('✅ [ROUTER] medico-plan-nutricional.js cargado correctamente');
+console.log(' [ROUTER] medico-plan-nutricional.js cargado correctamente');
 module.exports = router;

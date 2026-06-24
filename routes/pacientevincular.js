@@ -5,7 +5,7 @@ const { getConnection } = require('../conexion');
 const { verificarToken } = require('../middleware/auth');
 
 // ==========================================
-// 🔗 BUSCAR PACIENTE POR CÉDULA (para vincular)
+//  BUSCAR PACIENTE POR CÉDULA (para vincular)
 // ==========================================
 router.get('/buscar-cedula/:cedula', verificarToken, async (req, res) => {
   const { cedula } = req.params;
@@ -77,10 +77,10 @@ router.get('/buscar-cedula/:cedula', verificarToken, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Error buscando paciente:', err);
+    console.error(' Error buscando paciente:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al buscar paciente' });
   } finally {
-    // ✅ CORREGIDO: Usar release() NO end()
+    // CORREGIDO: Usar release() NO end()
     if (connection) {
       try { connection.release(); } catch (e) {}
     }
@@ -88,7 +88,7 @@ router.get('/buscar-cedula/:cedula', verificarToken, async (req, res) => {
 });
 
 // ==========================================
-// 🔗 VINCULAR PACIENTE CON USUARIO ACTUAL
+//  VINCULAR PACIENTE CON USUARIO ACTUAL
 // ==========================================
 router.post('/vincular', verificarToken, async (req, res) => {
   const { paciente_id } = req.body;
@@ -150,10 +150,10 @@ router.post('/vincular', verificarToken, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Error vinculando paciente:', err);
+    console.error(' Error vinculando paciente:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al vincular paciente' });
   } finally {
-    // ✅ CORREGIDO
+    //  CORREGIDO
     if (connection) {
       try { connection.release(); } catch (e) {}
     }

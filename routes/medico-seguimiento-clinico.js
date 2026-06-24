@@ -5,15 +5,15 @@ const { v4: uuidv4 } = require('uuid');
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando medico-seguimiento-clinico.js');
+console.log(' [ROUTER] Cargando medico-seguimiento-clinico.js');
 
 // ============================================================================
-// 🔒 Middleware: Verificar autenticación para todas las rutas
+//  Middleware: Verificar autenticación para todas las rutas
 // ============================================================================
 router.use(verificarToken);
 
 // ============================================================================
-// 📋 EVOLUCIONES CLÍNICAS
+//  EVOLUCIONES CLÍNICAS
 // ============================================================================
 
 // GET /nutricionapp-api/medico/seguimiento/evoluciones/:paciente_id
@@ -43,7 +43,7 @@ router.get('/evoluciones/:paciente_id', verificarRol('doctor', 'nutricionista', 
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error listando evoluciones:', err);
+    console.error(' [SEGUIMIENTO] Error listando evoluciones:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener evoluciones' 
@@ -99,7 +99,7 @@ router.post('/evolucion', verificarRol('doctor', 'nutricionista', 'enfermera'), 
       [id, paciente_id, medico_id, fecha, objetivos, observaciones || null, adherencia]
     );
 
-    console.log(`✅ [SEGUIMIENTO] Evolución creada: ${id} para paciente ${paciente_id}`);
+    console.log(` [SEGUIMIENTO] Evolución creada: ${id} para paciente ${paciente_id}`);
 
     return res.status(201).json({
       error: false,
@@ -108,7 +108,7 @@ router.post('/evolucion', verificarRol('doctor', 'nutricionista', 'enfermera'), 
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error creando evolución:', err);
+    console.error(' [SEGUIMIENTO] Error creando evolución:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al registrar evolución' 
@@ -138,7 +138,7 @@ router.delete('/evolucion/:id', verificarRol('doctor', 'nutricionista'), async (
       return res.status(404).json({ error: true, mensaje: 'Evolución no encontrada' });
     }
 
-    console.log(`✅ [SEGUIMIENTO] Evolución eliminada: ${id}`);
+    console.log(` [SEGUIMIENTO] Evolución eliminada: ${id}`);
 
     return res.status(200).json({
       error: false,
@@ -146,7 +146,7 @@ router.delete('/evolucion/:id', verificarRol('doctor', 'nutricionista'), async (
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error eliminando evolución:', err);
+    console.error(' [SEGUIMIENTO] Error eliminando evolución:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al eliminar evolución' 
@@ -159,7 +159,7 @@ router.delete('/evolucion/:id', verificarRol('doctor', 'nutricionista'), async (
 });
 
 // ============================================================================
-// 📅 CITAS
+//  CITAS
 // ============================================================================
 
 // GET /nutricionapp-api/medico/seguimiento/citas/:paciente_id
@@ -189,7 +189,7 @@ router.get('/citas/:paciente_id', verificarRol('doctor', 'nutricionista', 'enfer
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error listando citas:', err);
+    console.error(' [SEGUIMIENTO] Error listando citas:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener citas' 
@@ -254,7 +254,7 @@ router.post('/cita', verificarRol('doctor', 'nutricionista', 'enfermera'), async
       [id, paciente_id, medico_id, fecha_hora, tipo, motivo || null]
     );
 
-    console.log(`✅ [SEGUIMIENTO] Cita agendada: ${id} para ${fecha_hora}`);
+    console.log(` [SEGUIMIENTO] Cita agendada: ${id} para ${fecha_hora}`);
 
     return res.status(201).json({
       error: false,
@@ -263,7 +263,7 @@ router.post('/cita', verificarRol('doctor', 'nutricionista', 'enfermera'), async
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error agendando cita:', err);
+    console.error(' [SEGUIMIENTO] Error agendando cita:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al agendar cita' 
@@ -305,7 +305,7 @@ router.put('/cita/:id/estado', verificarRol('doctor', 'nutricionista', 'enfermer
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error actualizando cita:', err);
+    console.error(' [SEGUIMIENTO] Error actualizando cita:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al actualizar cita' });
   } finally {
     if (connection) {
@@ -332,7 +332,7 @@ router.delete('/cita/:id', verificarRol('doctor', 'nutricionista'), async (req, 
       return res.status(404).json({ error: true, mensaje: 'Cita no encontrada' });
     }
 
-    console.log(`✅ [SEGUIMIENTO] Cita eliminada: ${id}`);
+    console.log(` [SEGUIMIENTO] Cita eliminada: ${id}`);
 
     return res.status(200).json({
       error: false,
@@ -340,7 +340,7 @@ router.delete('/cita/:id', verificarRol('doctor', 'nutricionista'), async (req, 
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error eliminando cita:', err);
+    console.error(' [SEGUIMIENTO] Error eliminando cita:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al eliminar cita' });
   } finally {
     if (connection) {
@@ -350,7 +350,7 @@ router.delete('/cita/:id', verificarRol('doctor', 'nutricionista'), async (req, 
 });
 
 // ============================================================================
-// 💉 MEDICIONES DE GLUCOSA
+//  MEDICIONES DE GLUCOSA
 // ============================================================================
 
 // GET /nutricionapp-api/medico/seguimiento/glucosa/:paciente_id
@@ -381,7 +381,7 @@ router.get('/glucosa/:paciente_id', verificarRol('doctor', 'nutricionista', 'enf
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error listando glucosa:', err);
+    console.error(' [SEGUIMIENTO] Error listando glucosa:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener historial de glucosa' 
@@ -475,7 +475,7 @@ router.post('/glucosa', verificarRol('doctor', 'nutricionista', 'enfermera'), as
       ]
     );
 
-    console.log(`✅ [SEGUIMIENTO] Medición glucosa registrada: ${id}`);
+    console.log(` [SEGUIMIENTO] Medición glucosa registrada: ${id}`);
 
     return res.status(201).json({
       error: false,
@@ -484,7 +484,7 @@ router.post('/glucosa', verificarRol('doctor', 'nutricionista', 'enfermera'), as
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error registrando glucosa:', err);
+    console.error(' [SEGUIMIENTO] Error registrando glucosa:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al registrar medición' 
@@ -527,7 +527,7 @@ router.get('/glucosa/:paciente_id/actual', verificarRol('doctor', 'nutricionista
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error obteniendo medición actual:', err);
+    console.error(' [SEGUIMIENTO] Error obteniendo medición actual:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener medición' 
@@ -540,7 +540,7 @@ router.get('/glucosa/:paciente_id/actual', verificarRol('doctor', 'nutricionista
 });
 
 // ============================================================================
-// 📊 DASHBOARD DE SEGUIMIENTO
+//  DASHBOARD DE SEGUIMIENTO
 // ============================================================================
 
 // GET /nutricionapp-api/medico/seguimiento/dashboard/:paciente_id
@@ -610,7 +610,7 @@ router.get('/dashboard/:paciente_id', verificarRol('doctor', 'nutricionista'), a
     });
 
   } catch (err) {
-    console.error('❌ [SEGUIMIENTO] Error obteniendo dashboard:', err);
+    console.error(' [SEGUIMIENTO] Error obteniendo dashboard:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener dashboard' 

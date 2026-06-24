@@ -6,10 +6,10 @@ const { verificarToken } = require('../middleware/auth');
 const ML_SERVICE_URL =
   process.env.ML_SERVICE_URL || 'http://app-nutricion-microservicionutri-8wzlez:8001';
 
-console.log('🤖 ML_SERVICE_URL:', ML_SERVICE_URL);
+console.log(' ML_SERVICE_URL:', ML_SERVICE_URL);
 
 // ======================================================
-// 🔧 FUNCIÓN: Normalizar datos del frontend
+//  FUNCIÓN: Normalizar datos del frontend
 // ======================================================
 function normalizarPayload(body) {
   const datos = { ...body };
@@ -75,7 +75,7 @@ function normalizarPayload(body) {
 }
 
 // ======================================================
-// 🔍 FUNCIÓN: Validar payload normalizado
+//  FUNCIÓN: Validar payload normalizado
 // ======================================================
 function validarPayloadML(body) {
   const errores = [];
@@ -121,23 +121,23 @@ router.post(
     const inicioTiempo = Date.now();
 
     try {
-      console.log('\n📤 [ML-PROXY] Predicción recibida');
+      console.log('\n [ML-PROXY] Predicción recibida');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('Usuario:', req.usuario?.correo || req.usuario?.id);
-      console.log('📥 Payload ORIGINAL del frontend:');
+      console.log(' Payload ORIGINAL del frontend:');
       console.log(JSON.stringify(req.body, null, 2));
 
-      // 🔧 NORMALIZAR DATOS
+      //  NORMALIZAR DATOS
       const datosNormalizados = normalizarPayload(req.body);
       
-      console.log('\n🔄 Payload NORMALIZADO:');
+      console.log('\n Payload NORMALIZADO:');
       console.log(JSON.stringify(datosNormalizados, null, 2));
 
-      // ✅ VALIDAR
+      //  VALIDAR
       const errores = validarPayloadML(datosNormalizados);
 
       if (errores.length > 0) {
-        console.error('❌ Errores de validación:', errores);
+        console.error(' Errores de validación:', errores);
         return res.status(400).json({
           error: true,
           mensaje: 'Datos inválidos',
@@ -147,7 +147,7 @@ router.post(
         });
       }
 
-      // 📤 ENVIAR AL MICROSERVICIO ML
+      //  ENVIAR AL MICROSERVICIO ML
       const payloadML = {
         edad: datosNormalizados.edad,
         genero: datosNormalizados.genero,
@@ -157,7 +157,7 @@ router.post(
         tiene_diabetes: datosNormalizados.tiene_diabetes
       };
 
-      console.log('\n🚀 Enviando a ML Service:', JSON.stringify(payloadML));
+      console.log('\n Enviando a ML Service:', JSON.stringify(payloadML));
 
       const response = await axios.post(
         `${ML_SERVICE_URL}/prediccion-perfil`,
@@ -170,10 +170,10 @@ router.post(
 
       const duracion = Date.now() - inicioTiempo;
 
-      console.log('\n✅ Respuesta ML exitosa');
+      console.log('\n Respuesta ML exitosa');
       console.log('Perfil:', response.data.perfil_nombre);
       console.log('Confianza:', (response.data.confianza * 100).toFixed(2) + '%');
-      console.log(`⏱️ ${duracion}ms`);
+      console.log(` ${duracion}ms`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
       return res.status(200).json(response.data);
@@ -181,11 +181,11 @@ router.post(
     } catch (error) {
       const duracion = Date.now() - inicioTiempo;
 
-      console.error('\n❌ ERROR ML');
+      console.error('\n ERROR ML');
       console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.error('Mensaje:', error.message);
       console.error('Código:', error.code);
-      console.error(`⏱️ ${duracion}ms`);
+      console.error(` ${duracion}ms`);
 
       if (error.response) {
         console.error('Status:', error.response.status);
@@ -238,15 +238,15 @@ router.post(
 );
 
 // ======================================================
-// 🧪 POST /nutricionapp-api/api/ml/test
+//  POST /nutricionapp-api/api/ml/test
 // ======================================================
 router.post('/test', async (req, res) => {
   try {
-    console.log('\n🧪 [TEST] Payload recibido:');
+    console.log('\n [TEST] Payload recibido:');
     console.log(JSON.stringify(req.body, null, 2));
     
     const datosNormalizados = normalizarPayload(req.body);
-    console.log('\n🔄 Payload normalizado:');
+    console.log('\n Payload normalizado:');
     console.log(JSON.stringify(datosNormalizados, null, 2));
 
     const payloadML = {
@@ -274,7 +274,7 @@ router.post('/test', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error en test:', error.response?.data || error.message);
+    console.error(' Error en test:', error.response?.data || error.message);
     return res.status(500).json({
       success: false,
       error: error.message,

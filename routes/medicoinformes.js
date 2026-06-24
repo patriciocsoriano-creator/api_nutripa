@@ -4,14 +4,14 @@ const router = express.Router();
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando medicoinformes.js');
+console.log(' [ROUTER] Cargando medicoinformes.js');
 
 // Middleware para todas las rutas
 router.use(verificarToken);
 router.use(verificarRol('doctor', 'nutricionista'));
 
 // ============================================================================
-// 🤖 INFORMES DE IA - Evolución de la red neuronal
+//  INFORMES DE IA - Evolución de la red neuronal
 // GET /nutricionapp-api/medico/informes/ia
 // ============================================================================
 router.get('/ia', async (req, res) => {
@@ -21,7 +21,7 @@ router.get('/ia', async (req, res) => {
   try {
     connection = await getConnection();
 
-    // 1️⃣ Confianza promedio de la IA
+    //  Confianza promedio de la IA
     const [confianzaResult] = await connection.execute(
       `SELECT 
         AVG(confianza_ia) as promedio,
@@ -33,7 +33,7 @@ router.get('/ia', async (req, res) => {
 
     const confianzaPromedio = parseFloat(confianzaResult[0]?.promedio || 0) * 100;
 
-    // 2️⃣ Tendencia de confianza (comparar últimos 30 días vs anteriores)
+    //  Tendencia de confianza (comparar últimos 30 días vs anteriores)
     const [tendenciaResult] = await connection.execute(
       `SELECT 
         AVG(CASE WHEN fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN confianza_ia END) as reciente,
@@ -49,7 +49,7 @@ router.get('/ia', async (req, res) => {
       ? ((confianzaReciente - confianzaAnterior) / confianzaAnterior * 100).toFixed(1) 
       : 0;
 
-    // 3️⃣ Tasa de aceptación (planes activos o completados / total)
+    //  Tasa de aceptación (planes activos o completados / total)
     const [aceptacionResult] = await connection.execute(
       `SELECT 
         COUNT(*) as total,
@@ -63,7 +63,7 @@ router.get('/ia', async (req, res) => {
       ? (aceptacionResult[0]?.aceptados / aceptacionResult[0]?.total * 100)
       : 0;
 
-    // 4️⃣ Perfil más recomendado
+    //  Perfil más recomendado
     const [perfilResult] = await connection.execute(
       `SELECT 
         perfil_recomendado,
@@ -76,7 +76,7 @@ router.get('/ia', async (req, res) => {
       [medicoId]
     );
 
-    // 5️⃣ Distribución de perfiles
+    //  Distribución de perfiles
     const [distribucionResult] = await connection.execute(
       `SELECT 
         perfil_recomendado,
@@ -97,7 +97,7 @@ router.get('/ia', async (req, res) => {
       color: colores[i % colores.length]
     }));
 
-    // 6️⃣ Evolución de confianza por mes (últimos 6 meses)
+    //  Evolución de confianza por mes (últimos 6 meses)
     const [evolucionResult] = await connection.execute(
       `SELECT 
         DATE_FORMAT(fecha_creacion, '%Y-%m') as mes,
@@ -132,7 +132,7 @@ router.get('/ia', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [INFORMES] Error en informes/ia:', err);
+    console.error(' [INFORMES] Error en informes/ia:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al obtener informes de IA' });
   } finally {
     if (connection) try { connection.release(); } catch (e) {}
@@ -140,7 +140,7 @@ router.get('/ia', async (req, res) => {
 });
 
 // ============================================================================
-// 👥 INFORMES DE PACIENTES
+//  INFORMES DE PACIENTES
 // GET /nutricionapp-api/medico/informes/pacientes
 // ============================================================================
 router.get('/pacientes', async (req, res) => {
@@ -150,12 +150,12 @@ router.get('/pacientes', async (req, res) => {
   try {
     connection = await getConnection();
 
-    // 1️⃣ Total de pacientes
+    //  Total de pacientes
     const [totalResult] = await connection.execute(
       `SELECT COUNT(*) as total FROM pacientes WHERE eliminado_en IS NULL`
     );
 
-    // 2️⃣ Pacientes activos (con plan activo)
+    //  Pacientes activos (con plan activo)
     const [activosResult] = await connection.execute(
       `SELECT COUNT(DISTINCT p.id) as total
        FROM pacientes p
@@ -163,7 +163,7 @@ router.get('/pacientes', async (req, res) => {
        WHERE p.eliminado_en IS NULL AND pn.estado = 'activo'`
     );
 
-    // 3️⃣ Pacientes en riesgo (presión alta, glucosa alta, etc.)
+    //  Pacientes en riesgo (presión alta, glucosa alta, etc.)
     const [riesgoResult] = await connection.execute(
       `SELECT COUNT(DISTINCT r.paciente_id) as total
        FROM registro r
@@ -171,7 +171,7 @@ router.get('/pacientes', async (req, res) => {
          AND r.signos_vitales IS NOT NULL`
     );
 
-    // 4️⃣ Nuevos pacientes este mes
+    //  Nuevos pacientes este mes
     const [nuevosResult] = await connection.execute(
       `SELECT COUNT(*) as total 
        FROM pacientes 
@@ -180,7 +180,7 @@ router.get('/pacientes', async (req, res) => {
          AND YEAR(creado_en) = YEAR(NOW())`
     );
 
-    // 5️⃣ Distribución por sexo
+    //  Distribución por sexo
     const [sexoResult] = await connection.execute(
       `SELECT 
         sexo,
@@ -202,7 +202,7 @@ router.get('/pacientes', async (req, res) => {
       femenino: totalPacientes > 0 ? (distribucionSexo.femenino / totalPacientes * 100) : 0
     };
 
-    // 6️⃣ Edad promedio, min y max
+    //  Edad promedio, min y max
     const [edadResult] = await connection.execute(
       `SELECT 
         AVG(TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE())) as promedio,
@@ -228,7 +228,7 @@ router.get('/pacientes', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [INFORMES] Error en informes/pacientes:', err);
+    console.error(' [INFORMES] Error en informes/pacientes:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al obtener informes de pacientes' });
   } finally {
     if (connection) try { connection.release(); } catch (e) {}
@@ -236,7 +236,7 @@ router.get('/pacientes', async (req, res) => {
 });
 
 // ============================================================================
-// 📋 INFORMES DE PLANES NUTRICIONALES
+//  INFORMES DE PLANES NUTRICIONALES
 // GET /nutricionapp-api/medico/informes/planes
 // ============================================================================
 router.get('/planes', async (req, res) => {
@@ -246,13 +246,13 @@ router.get('/planes', async (req, res) => {
   try {
     connection = await getConnection();
 
-    // 1️⃣ Total de planes
+    //  Total de planes
     const [totalResult] = await connection.execute(
       `SELECT COUNT(*) as total FROM planes_nutricionales WHERE medico_id = ?`,
       [medicoId]
     );
 
-    // 2️⃣ Planes este mes
+    //  Planes este mes
     const [esteMesResult] = await connection.execute(
       `SELECT COUNT(*) as total 
        FROM planes_nutricionales 
@@ -262,7 +262,7 @@ router.get('/planes', async (req, res) => {
       [medicoId]
     );
 
-    // 3️⃣ Planes por estado
+    // Planes por estado
     const [estadoResult] = await connection.execute(
       `SELECT 
         estado,
@@ -294,11 +294,11 @@ router.get('/planes', async (req, res) => {
       cancelado: totalPlanes > 0 ? (estados.cancelado / totalPlanes * 100) : 0
     };
 
-    // 4️⃣ Tasa de éxito (completados / (completados + cancelados))
+    //  Tasa de éxito (completados / (completados + cancelados))
     const finalizados = estados.completado + estados.cancelado;
     const tasaExito = finalizados > 0 ? (estados.completado / finalizados * 100) : 0;
 
-    // 5️⃣ Duración promedio de planes completados
+    //  Duración promedio de planes completados
     const [duracionResult] = await connection.execute(
       `SELECT AVG(duracion_semanas) as promedio
        FROM planes_nutricionales 
@@ -322,7 +322,7 @@ router.get('/planes', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [INFORMES] Error en informes/planes:', err);
+    console.error(' [INFORMES] Error en informes/planes:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al obtener informes de planes' });
   } finally {
     if (connection) try { connection.release(); } catch (e) {}
@@ -330,7 +330,7 @@ router.get('/planes', async (req, res) => {
 });
 
 // ============================================================================
-// 🚨 INFORMES DE ALERTAS CLÍNICAS
+//  INFORMES DE ALERTAS CLÍNICAS
 // GET /nutricionapp-api/medico/informes/alertas
 // ============================================================================
 router.get('/alertas', async (req, res) => {
@@ -447,7 +447,7 @@ router.get('/alertas', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [INFORMES] Error en informes/alertas:', err);
+    console.error(' [INFORMES] Error en informes/alertas:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al obtener alertas' });
   } finally {
     if (connection) try { connection.release(); } catch (e) {}
@@ -455,7 +455,7 @@ router.get('/alertas', async (req, res) => {
 });
 
 // ============================================================================
-// 📊 INFORMES DE REGISTROS CLÍNICOS
+//  INFORMES DE REGISTROS CLÍNICOS
 // GET /nutricionapp-api/medico/informes/registros
 // ============================================================================
 router.get('/registros', async (req, res) => {
@@ -465,7 +465,7 @@ router.get('/registros', async (req, res) => {
   try {
     connection = await getConnection();
 
-    // 1️⃣ Registros finalizados
+    // Registros finalizados
     const [finalizadosResult] = await connection.execute(
       `SELECT COUNT(*) as total,
         AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_finalizacion)) as tiempo_promedio
@@ -474,7 +474,7 @@ router.get('/registros', async (req, res) => {
       [medicoId]
     );
 
-    // 2️⃣ Registros en proceso (no finalizados ni cancelados)
+    //  Registros en proceso (no finalizados ni cancelados)
     const [enProcesoResult] = await connection.execute(
       `SELECT COUNT(*) as total 
        FROM registro 
@@ -483,7 +483,7 @@ router.get('/registros', async (req, res) => {
       [medicoId]
     );
 
-    // 3️⃣ Registros cancelados
+    //  Registros cancelados
     const [canceladosResult] = await connection.execute(
       `SELECT COUNT(*) as total 
        FROM registro 
@@ -516,7 +516,7 @@ router.get('/registros', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [INFORMES] Error en informes/registros:', err);
+    console.error(' [INFORMES] Error en informes/registros:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al obtener informes de registros' });
   } finally {
     if (connection) try { connection.release(); } catch (e) {}

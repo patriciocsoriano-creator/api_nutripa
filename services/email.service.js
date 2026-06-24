@@ -2,7 +2,7 @@
 const nodemailer = require('nodemailer');
 
 // ============================================
-// 🔧 CONFIGURACIÓN DEL TRANSPORTER (GMAIL SMTP)
+//  CONFIGURACIÓN DEL TRANSPORTER (GMAIL SMTP)
 // ============================================
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -21,13 +21,13 @@ const transporter = nodemailer.createTransport({
 // Verificar conexión al iniciar
 transporter.verify()
     .then(() => {
-        console.log('✅ [EMAIL] Gmail SMTP configurado correctamente');
-        console.log(`📧 [EMAIL] Enviando desde: ${process.env.EMAIL_USER}`);
+        console.log(' [EMAIL] Gmail SMTP configurado correctamente');
+        console.log(` [EMAIL] Enviando desde: ${process.env.EMAIL_USER}`);
     })
     .catch(err => {
-        console.error('❌ [EMAIL] Error configurando Gmail SMTP:', err.message);
+        console.error(' [EMAIL] Error configurando Gmail SMTP:', err.message);
         if (err.code === 'EAUTH') {
-            console.error('💡 [EMAIL] Verifica:');
+            console.error(' [EMAIL] Verifica:');
             console.error('   1. Que EMAIL_USER sea tu correo Gmail completo');
             console.error('   2. Que EMAIL_PASS sea una Contraseña de Aplicación (no tu contraseña normal)');
             console.error('   3. Que tengas verificación en 2 pasos activada');
@@ -80,7 +80,7 @@ async function sendRecoveryEmail(correo, nombre, codigo) {
                                 <tr>
                                     <td style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 8px;">
                                         <p style="margin: 0; color: #856404; font-size: 14px;">
-                                            ⚠️ <strong>Importante:</strong> Este código expira en <strong>15 minutos</strong>. 
+                                             <strong>Importante:</strong> Este código expira en <strong>15 minutos</strong>. 
                                             Si no solicitaste este cambio, ignora este correo.
                                         </p>
                                     </td>
@@ -116,23 +116,23 @@ async function sendRecoveryEmail(correo, nombre, codigo) {
     const mailOptions = {
         from: `"${process.env.EMAIL_FROM_NAME || 'NutriPA'}" <${process.env.EMAIL_USER}>`,
         to: correo,
-        subject: '🔐 Código de recuperación - NutriPA',
+        subject: ' Código de recuperación - NutriPA',
         text: text,
         html: html
     };
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`✅ [EMAIL] Correo enviado a ${correo} (ID: ${info.messageId})`);
+        console.log(` [EMAIL] Correo enviado a ${correo} (ID: ${info.messageId})`);
         return info;
     } catch (error) {
-        console.error('❌ [EMAIL] Error enviando correo:', error.message);
+        console.error(' [EMAIL] Error enviando correo:', error.message);
         throw error;
     }
 }
 
 // ============================================
-// ✅ ENVIAR CONFIRMACIÓN DE CAMBIO EXITOSO
+//  ENVIAR CONFIRMACIÓN DE CAMBIO EXITOSO
 // ============================================
 async function sendPasswordUpdatedEmail(correo, nombre) {
     const html = `
@@ -167,7 +167,7 @@ async function sendPasswordUpdatedEmail(correo, nombre) {
                                 <tr>
                                     <td style="background: #fee2e2; border-left: 4px solid #dc2626; padding: 12px 16px; border-radius: 8px;">
                                         <p style="margin: 0; color: #991b1b; font-size: 14px;">
-                                            🚨 <strong>¿No fuiste tú?</strong><br>
+                                             <strong>¿No fuiste tú?</strong><br>
                                             Si no realizaste este cambio, contacta inmediatamente a soporte y bloquea tu cuenta.
                                         </p>
                                     </td>
@@ -196,17 +196,17 @@ async function sendPasswordUpdatedEmail(correo, nombre) {
     const mailOptions = {
         from: `"${process.env.EMAIL_FROM_NAME || 'NutriPA'}" <${process.env.EMAIL_USER}>`,
         to: correo,
-        subject: '✅ Contraseña actualizada - NutriPA',
+        subject: ' Contraseña actualizada - NutriPA',
         text: text,
         html: html
     };
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`✅ [EMAIL] Confirmación enviada a ${correo}`);
+        console.log(` [EMAIL] Confirmación enviada a ${correo}`);
         return info;
     } catch (error) {
-        console.error('❌ [EMAIL] Error enviando confirmación:', error.message);
+        console.error(' [EMAIL] Error enviando confirmación:', error.message);
         // No lanzamos error porque no es crítico
     }
 }

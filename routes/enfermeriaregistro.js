@@ -1,5 +1,5 @@
 // routes/enfermeriaregistro.js - VERSIÓN FINAL CON SMART NAVIGATION
-console.log('✅ [ROUTER] Cargando enfermeriaregistro.js');
+console.log(' [ROUTER] Cargando enfermeriaregistro.js');
 
 const express = require('express');
 const router = express.Router();
@@ -7,18 +7,18 @@ const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 
-// 👇 Middleware de debug para ver todas las peticiones
+//  Middleware de debug para ver todas las peticiones
 router.use((req, res, next) => {
   let bodyInfo = undefined;
   
-  // ✅ Solo procesar body si existe (POST/PUT)
+  //  Solo procesar body si existe (POST/PUT)
   if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
     bodyInfo = { ...req.body };
     // Ocultar contraseña si existe
     if (bodyInfo.password) bodyInfo.password = '***';
   }
   
-  console.log('🔍 [ROUTER DEBUG]', {
+  console.log(' [ROUTER DEBUG]', {
     method: req.method,
     path: req.path,
     params: req.params,
@@ -28,7 +28,7 @@ router.use((req, res, next) => {
 });
 
 // ==========================================
-// 🆕 OBTENER ESTADO COMPLETO DEL REGISTRO (SMART NAVIGATION)
+//  OBTENER ESTADO COMPLETO DEL REGISTRO (SMART NAVIGATION)
 // ==========================================
 router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor', 'admin'), async (req, res) => {
   const { registro_id } = req.params;
@@ -37,7 +37,7 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
   try {
     connection = await getConnection();
 
-    // 1️⃣ Obtener datos del registro con info del paciente
+    //  Obtener datos del registro con info del paciente
     const [registros] = await connection.execute(
       `SELECT 
         r.id,
@@ -70,7 +70,7 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
 
     const registro = registros[0];
 
-    // 2️⃣ Determinar qué pasos están completos
+    //  Determinar qué pasos están completos
     const pasosCompletos = {
       datos_personales: !!registro.datos_personales,
       signos_vitales: !!registro.signos_vitales,
@@ -78,7 +78,7 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
       condiciones_metabolicas: !!registro.condiciones_metabolicas
     };
 
-    // 3️⃣ Determinar el siguiente paso a navegar
+    //  Determinar el siguiente paso a navegar
     let siguientePaso = 'registroinfopaciente'; // Por defecto
     if (registro.estado === 'finalizado') {
       siguientePaso = 'registrofinalizado';
@@ -92,7 +92,7 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
       siguientePaso = 'registroinfopaciente';
     }
 
-    // 4️⃣ Parsear JSONs de cada paso
+    //  Parsear JSONs de cada paso
     let datosPersonales = null;
     let signosVitales = null;
     let datosAntropometricos = null;
@@ -104,10 +104,10 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
       if (registro.datos_antropometricos) datosAntropometricos = JSON.parse(registro.datos_antropometricos);
       if (registro.condiciones_metabolicas) condicionesMetabolicas = JSON.parse(registro.condiciones_metabolicas);
     } catch (e) {
-      console.warn('⚠️ Error parseando JSONs:', e.message);
+      console.warn(' Error parseando JSONs:', e.message);
     }
 
-    console.log(`🔍 [ESTADO] Registro ${registro_id}: estado=${registro.estado}, siguiente=${siguientePaso}`);
+    console.log(` [ESTADO] Registro ${registro_id}: estado=${registro.estado}, siguiente=${siguientePaso}`);
 
     return res.status(200).json({
       error: false,
@@ -141,7 +141,7 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
     });
 
   } catch (err) {
-    console.error('❌ [ESTADO] Error:', err);
+    console.error(' [ESTADO] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener estado del registro: ' + err.message 
@@ -158,7 +158,7 @@ router.get('/:registro_id/estado', verificarToken, verificarRol('enfermera', 'nu
 //  CORREGIDO: Reactiva pacientes eliminados en lugar de fallar
 // ==========================================
 router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor'), async (req, res) => {
-  console.log('🆕 [REGISTRO] Iniciando nuevo registro', { cedula: req.body?.cedula });
+  console.log(' [REGISTRO] Iniciando nuevo registro', { cedula: req.body?.cedula });
 
   const { cedula, nombres, apellidos } = req.body;
   const registrado_por = req.usuario.id;
@@ -171,7 +171,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
   try {
     connection = await getConnection();
 
-    // 1️⃣ Buscar paciente SIN filtro de eliminado_en
+    //  Buscar paciente SIN filtro de eliminado_en
     const [pacientesExistentes] = await connection.execute(
       `SELECT id, eliminado_en FROM pacientes WHERE numero_identificacion = ?`,
       [cedula]
@@ -182,7 +182,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
     if (pacientesExistentes.length > 0) {
       paciente_id = pacientesExistentes[0].id;
       
-      // 2️⃣ Si existe pero estaba eliminado → REACTIVAR
+      //  Si existe pero estaba eliminado → REACTIVAR
       if (pacientesExistentes[0].eliminado_en) {
         console.log(`[REGISTRO] Reactivando paciente eliminado: ${cedula}`);
         await connection.execute(
@@ -196,7 +196,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
           [nombres.trim(), apellidos.trim(), paciente_id]
         );
       } else {
-        // 3️⃣ Si existe y está activo → verificar si tiene registro en progreso
+        //  Si existe y está activo → verificar si tiene registro en progreso
         const [registrosActivos] = await connection.execute(
           `SELECT id FROM registro 
            WHERE paciente_id = ? AND estado NOT IN ('finalizado', 'cancelado')`,
@@ -212,7 +212,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
         }
       }
     } else {
-      // 4️⃣ Si NO existe → crear nuevo paciente
+      //  Si NO existe → crear nuevo paciente
       console.log(`[REGISTRO] Creando nuevo paciente: ${cedula}`);
       paciente_id = uuidv4();
       
@@ -223,7 +223,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
       );
     }
 
-    // 5️⃣ Crear el nuevo registro clínico
+    // Crear el nuevo registro clínico
     const registro_id = uuidv4();
     await connection.execute(
       `INSERT INTO registro (id, paciente_id, registrado_por, estado, creado_en) 
@@ -231,7 +231,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
       [registro_id, paciente_id, registrado_por]
     );
 
-    console.log('✅ [REGISTRO] Registro iniciado', { registro_id, paciente_id, estado: 'iniciado' });
+    console.log(' [REGISTRO] Registro iniciado', { registro_id, paciente_id, estado: 'iniciado' });
 
     return res.status(201).json({
       error: false,
@@ -243,7 +243,7 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
     });
 
   } catch (err) {
-    console.error('❌ [REGISTRO] Error:', {
+    console.error(' [REGISTRO] Error:', {
       message: err.message,
       code: err.code,
       sql: err.sql,
@@ -271,20 +271,20 @@ router.post('/iniciar', verificarToken, verificarRol('enfermera', 'nutricionista
 });
 
 // ==========================================
-// 📝 DATOS PERSONALES (ACTUALIZA TABLA PACIENTES)
+//  DATOS PERSONALES (ACTUALIZA TABLA PACIENTES)
 // ==========================================
 router.post('/:registro_id/datos-personales', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor'), async (req, res) => {
   const { registro_id } = req.params;
   const { fechaNacimiento, sexo, direccion, telefono, ocupacion, actividadFisica } = req.body;
   const usuario_id = req.usuario.id;
 
-  console.log('📝 [REGISTRO] Guardando datos personales', { registro_id });
+  console.log(' [REGISTRO] Guardando datos personales', { registro_id });
 
   let connection;
   try {
     connection = await getConnection();
 
-    // 1️⃣ Verificar registro y obtener paciente_id
+    //  Verificar registro y obtener paciente_id
     const [registros] = await connection.execute(
       `SELECT r.id, r.paciente_id, r.estado 
        FROM registro r
@@ -298,7 +298,7 @@ router.post('/:registro_id/datos-personales', verificarToken, verificarRol('enfe
 
     const paciente_id = registros[0].paciente_id;
 
-    // 2️⃣ ✅ ACTUALIZAR TABLA PACIENTES (Para que no queden en NULL)
+    //  ACTUALIZAR TABLA PACIENTES (Para que no queden en NULL)
     await connection.execute(
       `UPDATE pacientes SET 
          fecha_nacimiento = ?, 
@@ -319,9 +319,9 @@ router.post('/:registro_id/datos-personales', verificarToken, verificarRol('enfe
         paciente_id
       ]
     );
-    console.log('✅ [REGISTRO] Tabla pacientes actualizada');
+    console.log(' [REGISTRO] Tabla pacientes actualizada');
 
-    // 3️⃣ Mantener historial en tabla registro (JSON)
+    //  Mantener historial en tabla registro (JSON)
     await connection.execute(
       `UPDATE registro 
        SET datos_personales = JSON_SET(
@@ -342,7 +342,7 @@ router.post('/:registro_id/datos-personales', verificarToken, verificarRol('enfe
       ]
     );
 
-    console.log('✅ [REGISTRO] Datos guardados en BD');
+    console.log(' [REGISTRO] Datos guardados en BD');
 
     return res.json({
       error: false,
@@ -352,7 +352,7 @@ router.post('/:registro_id/datos-personales', verificarToken, verificarRol('enfe
     });
 
   } catch (err) {
-    console.error('❌ [REGISTRO] Error guardando datos personales:', err);
+    console.error(' [REGISTRO] Error guardando datos personales:', err);
     return res.status(500).json({ error: true, mensaje: 'Error al guardar datos: ' + err.message });
   } finally {
     if (connection) { try { connection.release(); } catch (e) {} }
@@ -360,14 +360,14 @@ router.post('/:registro_id/datos-personales', verificarToken, verificarRol('enfe
 });
 
 // ==========================================
-// ❤️ SIGNOS VITALES
+//  SIGNOS VITALES
 // ==========================================
 router.post('/:registro_id/signos-vitales', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor'), async (req, res) => {
   const { registro_id } = req.params;
   const { frecuenciaCardiaca, presionArterial, frecuenciaRespiratoria, temperatura, spo2, glucosaAyunas, glucosaPostprandial, hemoglobinaGlicosilada } = req.body;
   const usuario_id = req.usuario.id;
 
-  console.log('❤️ [REGISTRO] Guardando signos vitales', { registro_id });
+  console.log(' [REGISTRO] Guardando signos vitales', { registro_id });
 
   let connection;
   try {
@@ -391,11 +391,11 @@ router.post('/:registro_id/signos-vitales', verificarToken, verificarRol('enferm
        spo2 || null, glucosaAyunas || null, glucosaPostprandial || null, hemoglobinaGlicosilada || null, registro_id]
     );
 
-    console.log('✅ [REGISTRO] Signos vitales guardados', { registro_id, nuevo_estado: 'signos_vitales' });
+    console.log(' [REGISTRO] Signos vitales guardados', { registro_id, nuevo_estado: 'signos_vitales' });
     return res.json({ error: false, mensaje: 'Guardados', estado: 'signos_vitales', siguiente_paso: 'antropometricos' });
 
   } catch (err) {
-    console.error('❌ [REGISTRO] Error:', err.message);
+    console.error(' [REGISTRO] Error:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error: ' + err.message });
   } finally {
     if (connection) { try { connection.release(); } catch (e) {} }
@@ -403,7 +403,7 @@ router.post('/:registro_id/signos-vitales', verificarToken, verificarRol('enferm
 });
 
 // ==========================================
-// 📏 ANTROPOMÉTRICOS
+//  ANTROPOMÉTRICOS
 // ==========================================
 router.post('/:registro_id/antropometricos', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor'), async (req, res) => {
   const { registro_id } = req.params;
@@ -414,7 +414,7 @@ router.post('/:registro_id/antropometricos', verificarToken, verificarRol('enfer
     return res.status(400).json({ error: true, mensaje: 'Peso y talla son obligatorios y mayores a 0' });
   }
 
-  console.log('📏 [REGISTRO] Guardando antropométricos', { registro_id });
+  console.log(' [REGISTRO] Guardando antropométricos', { registro_id });
   const imc = peso / (talla * talla);
 
   let connection;
@@ -437,11 +437,11 @@ router.post('/:registro_id/antropometricos', verificarToken, verificarRol('enfer
       [peso, talla, parseFloat(imc.toFixed(2)), circunferenciaCintura || null, registro_id]
     );
 
-    console.log('✅ [REGISTRO] Antropométricos guardados', { registro_id, nuevo_estado: 'antropometricos', imc: parseFloat(imc.toFixed(2)) });
+    console.log(' [REGISTRO] Antropométricos guardados', { registro_id, nuevo_estado: 'antropometricos', imc: parseFloat(imc.toFixed(2)) });
     return res.json({ error: false, mensaje: 'Guardados', estado: 'antropometricos', imc_calculado: parseFloat(imc.toFixed(2)), siguiente_paso: 'metabolicas' });
 
   } catch (err) {
-    console.error('❌ [REGISTRO] Error:', err.message);
+    console.error(' [REGISTRO] Error:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error: ' + err.message });
   } finally {
     if (connection) { try { connection.release(); } catch (e) {} }
@@ -449,14 +449,14 @@ router.post('/:registro_id/antropometricos', verificarToken, verificarRol('enfer
 });
 
 // ==========================================
-// 🧬 METABÓLICAS + FINALIZAR
+//  METABÓLICAS + FINALIZAR
 // ==========================================
 router.post('/:registro_id/metabolicas', verificarToken, verificarRol('enfermera', 'nutricionista', 'doctor'), async (req, res) => {
   const { registro_id } = req.params;
   const { hipertension, obesidad, dislipidemia, higadoGraso, resistenciaInsulina } = req.body;
   const usuario_id = req.usuario.id;
 
-  console.log('🧬 [REGISTRO] === INICIANDO FINALIZACIÓN ===', { registro_id, usuario_id });
+  console.log(' [REGISTRO] === INICIANDO FINALIZACIÓN ===', { registro_id, usuario_id });
 
   let connection;
   try {
@@ -498,7 +498,7 @@ router.post('/:registro_id/metabolicas', verificarToken, verificarRol('enfermera
       ]
     );
 
-    console.log('✅ [REGISTRO] === FINALIZADO EXITOSAMENTE ===', { registro_id });
+    console.log(' [REGISTRO] === FINALIZADO EXITOSAMENTE ===', { registro_id });
 
     if (connection) { try { connection.release(); } catch (e) {} }
     connection = null;
@@ -517,7 +517,7 @@ router.post('/:registro_id/metabolicas', verificarToken, verificarRol('enfermera
     });
 
   } catch (err) {
-    console.error('❌ [REGISTRO] Error:', { message: err.message, code: err.code });
+    console.error(' [REGISTRO] Error:', { message: err.message, code: err.code });
     
     if (connection) { try { connection.release(); } catch (e) {} }
     
@@ -529,13 +529,13 @@ router.post('/:registro_id/metabolicas', verificarToken, verificarRol('enfermera
 });
 
 // ==========================================
-// ❌ CANCELAR REGISTRO
+//  CANCELAR REGISTRO
 // ==========================================
 router.post('/:registro_id/cancelar', verificarToken, verificarRol('enfermera', 'nutricionista'), async (req, res) => {
   const { registro_id } = req.params;
   const usuario_id = req.usuario.id;
 
-  console.log('❌ [REGISTRO] Cancelando', { registro_id });
+  console.log(' [REGISTRO] Cancelando', { registro_id });
   
   let connection;
   try {
@@ -552,16 +552,16 @@ router.post('/:registro_id/cancelar', verificarToken, verificarRol('enfermera', 
     
     await connection.execute(`UPDATE registro SET estado = 'cancelado', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?`, [registro_id]);
     
-    console.log('✅ [REGISTRO] Cancelado', { registro_id });
+    console.log(' [REGISTRO] Cancelado', { registro_id });
     return res.json({ error: false, mensaje: 'Cancelado', registro_id });
     
   } catch (err) {
-    console.error('❌ [REGISTRO] Error:', err.message);
+    console.error(' [REGISTRO] Error:', err.message);
     return res.status(500).json({ error: true, mensaje: 'Error: ' + err.message });
   } finally {
     if (connection) { try { connection.release(); } catch (e) {} }
   }
 });
 
-console.log('✅ [ROUTER] enfermeriaregistro.js cargado correctamente');
+console.log(' [ROUTER] enfermeriaregistro.js cargado correctamente');
 module.exports = router;

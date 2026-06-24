@@ -9,7 +9,7 @@ console.log('🔗 [CONEXION] Iniciando conexión inmediata a BD...');
 
 const app = express();
 
-// ✅ CORS explícito
+//  CORS explícito
 app.use(cors({
   origin: [
     'http://localhost:8100',
@@ -28,45 +28,45 @@ app.options(/.*/, cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 👇 POOL MySQL - Se crea INMEDIATAMENTE al cargar este módulo
+//  POOL MySQL - Se crea INMEDIATAMENTE al cargar este módulo
 console.log('🗄️ [CONEXION] Creando pool de conexiones...');
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',  // 👈 IP para evitar problemas DNS en Windows
+  host: process.env.DB_HOST || '127.0.0.1',  // IP para evitar problemas DNS en Windows
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'nutripa_db',
   port: parseInt(process.env.DB_PORT) || 3306,
   charset: 'utf8mb4',
   
-  // ✅ Opciones válidas para createPool:
+  //  Opciones válidas para createPool:
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
   
-  // ✅ Timeouts válidos:
+  //  Timeouts válidos:
   connectTimeout: 10000,    // 10s para conectar
   idleTimeout: 60000        // 60s para conexiones inactivas
   
-  // ❌ REMOVER: acquireTimeout (NO válido para pool)
+  //  REMOVER: acquireTimeout (NO válido para pool)
 });
 
-// 👇 Verificar conexión inmediatamente (sin bloquear el arranque del servidor)
+//  Verificar conexión inmediatamente (sin bloquear el arranque del servidor)
 (async () => {
   try {
-    console.log('🔍 [CONEXION] Probando conexión inicial...');
+    console.log(' [CONEXION] Probando conexión inicial...');
     const connection = await pool.getConnection();
-    console.log('✅ [CONEXION] Conexión a BD exitosa');
+    console.log(' [CONEXION] Conexión a BD exitosa');
     connection.release();
   } catch (error) {
-    console.warn('⚠️ [CONEXION] No se pudo conectar a BD inicialmente:', error.message);
-    console.warn('⚠️ [CONEXION] El servidor seguirá corriendo. Reintentará en la próxima petición.');
+    console.warn(' [CONEXION] No se pudo conectar a BD inicialmente:', error.message);
+    console.warn(' [CONEXION] El servidor seguirá corriendo. Reintentará en la próxima petición.');
   }
 })();
 
-// 👇 Funciones exportadas
+//  Funciones exportadas
 async function getConnection() {
   return await pool.getConnection();
 }
@@ -79,7 +79,7 @@ async function query(sql, params) {
 async function closePool() {
   console.log('🔌 [CONEXION] Cerrando pool...');
   await pool.end();
-  console.log('✅ [CONEXION] Pool cerrado');
+  console.log(' [CONEXION] Pool cerrado');
 }
 
 app.get('/', (req, res) => {
@@ -90,5 +90,5 @@ app.get('/', (req, res) => {
   });
 });
 
-console.log('✅ [CONEXION] Módulo exportado (pool inicializado)');
+console.log(' [CONEXION] Módulo exportado (pool inicializado)');
 module.exports = { getConnection, query, closePool, app, pool };

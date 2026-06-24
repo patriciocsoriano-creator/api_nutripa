@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const { getConnection } = require('../conexion');
 const { v4: uuidv4 } = require('uuid');
 
-// 🔍 Función para validar cédula ecuatoriana
+//  Función para validar cédula ecuatoriana
 const validarCedulaEcuador = (cedula) => {
     if (!/^\d{10}$/.test(cedula)) return false;
     
@@ -32,8 +32,8 @@ const validarCedulaEcuador = (cedula) => {
 };
 
 // ============================================================================
-// 🔍 GET /nutricionapp-api/registro/buscar-paciente
-// 👉 BUSCAR PACIENTE EXISTENTE POR CÉDULA O NOMBRE
+//  GET /nutricionapp-api/registro/buscar-paciente
+//  BUSCAR PACIENTE EXISTENTE POR CÉDULA O NOMBRE
 // ============================================================================
 router.get('/buscar-paciente', async (req, res) => {
     const { cedula, nombre, apellido } = req.query;
@@ -115,7 +115,7 @@ router.get('/buscar-paciente', async (req, res) => {
         
         const paciente = pacientes[0];
         
-        // 🆕 CASO 1: Si ya tiene usuario vinculado Y el rol es paciente
+        // CASO 1: Si ya tiene usuario vinculado Y el rol es paciente
         if (paciente.usuario_id && paciente.correo_existente && paciente.rol_existente === 'paciente') {
             return res.status(200).json({
                 error: false,
@@ -126,7 +126,7 @@ router.get('/buscar-paciente', async (req, res) => {
             });
         }
         
-        // 🆕 CASO 2: Si tiene usuario vinculado pero con OTRO rol (ej: nutricionista)
+        //  CASO 2: Si tiene usuario vinculado pero con OTRO rol (ej: nutricionista)
         if (paciente.usuario_id && paciente.correo_existente && paciente.rol_existente !== 'paciente') {
             return res.status(200).json({
                 error: false,
@@ -139,7 +139,7 @@ router.get('/buscar-paciente', async (req, res) => {
             });
         }
         
-        // ✅ CASO 3: Paciente existe pero NO tiene cuenta → autocompletar
+        // CASO 3: Paciente existe pero NO tiene cuenta → autocompletar
         return res.status(200).json({
             error: false,
             encontrado: true,
@@ -158,11 +158,11 @@ router.get('/buscar-paciente', async (req, res) => {
                 ocupacion: paciente.ocupacion,
                 actividadFisica: paciente.actividad_fisica
             },
-            mensaje: '✅ Se encontraron tus datos. Complete su correo y contraseña para crear su cuenta.'
+            mensaje: ' Se encontraron tus datos. Complete su correo y contraseña para crear su cuenta.'
         });
 
     } catch (err) {
-        console.error('❌ Error buscando paciente:', err);
+        console.error(' Error buscando paciente:', err);
         return res.status(500).json({ 
             error: true, 
             mensaje: 'Error al buscar paciente' 
@@ -175,8 +175,8 @@ router.get('/buscar-paciente', async (req, res) => {
 });
 
 // ============================================================================
-// 📝 POST /nutricionapp-api/registro
-// 👉 REGISTRO DE NUEVO USUARIO
+//  POST /nutricionapp-api/registro
+// REGISTRO DE NUEVO USUARIO
 // ============================================================================
 router.post('/', async (req, res) => {
     const {
@@ -209,7 +209,7 @@ router.post('/', async (req, res) => {
     try {
         connection = await getConnection();
 
-        // 🆕 Verificar si el correo ya existe
+        //  Verificar si el correo ya existe
         const [existeCorreo] = await connection.execute(
             'SELECT id, rol_id FROM usuarios WHERE correo = ? AND eliminado_en IS NULL',
             [correo.toLowerCase().trim()]
@@ -218,7 +218,7 @@ router.post('/', async (req, res) => {
             return res.status(409).json({ error: true, mensaje: 'El correo ya está registrado' });
         }
 
-        // 🆕 Verificar si la cédula ya existe en usuarios
+        //  Verificar si la cédula ya existe en usuarios
         const [existeCedula] = await connection.execute(
             `SELECT u.id, u.correo, r.nombre as rol_nombre 
              FROM usuarios u 
@@ -230,7 +230,7 @@ router.post('/', async (req, res) => {
         if (existeCedula.length > 0) {
             const usuarioExistente = existeCedula[0];
             
-            // 🆕 Si la cédula ya existe con el MISMO rol que intenta registrar
+            //  Si la cédula ya existe con el MISMO rol que intenta registrar
             if (usuarioExistente.rol_nombre === rol.toLowerCase()) {
                 return res.status(409).json({ 
                     error: true, 
@@ -238,7 +238,7 @@ router.post('/', async (req, res) => {
                 });
             }
             
-            // 🆕 Si la cédula ya existe con OTRO rol
+            //  Si la cédula ya existe con OTRO rol
             return res.status(409).json({ 
                 error: true, 
                 mensaje: `La cédula ya está registrada como <strong>${usuarioExistente.rol_nombre}</strong>. No puede registrarse con otro rol usando la misma cédula. Contacte al administrador.` 
@@ -280,12 +280,12 @@ router.post('/', async (req, res) => {
             ]
         );
 
-        console.log(`✅ Usuario creado: ${usuarioId} (${rol})`);
+        console.log(` Usuario creado: ${usuarioId} (${rol})`);
 
         // Si es paciente, vincular con paciente existente o crear nuevo
         if (rol.toLowerCase() === 'paciente') {
             if (vincularPaciente && pacienteExistenteId) {
-                // 🆕 VINCULAR paciente existente al nuevo usuario
+                //  VINCULAR paciente existente al nuevo usuario
                 const [updateResult] = await connection.execute(
                     `UPDATE pacientes 
                      SET usuario_id = ?, 
@@ -295,9 +295,9 @@ router.post('/', async (req, res) => {
                 );
                 
                 if (updateResult.affectedRows > 0) {
-                    console.log(`✅ Paciente ${pacienteExistenteId} vinculado al usuario ${usuarioId}`);
+                    console.log(` Paciente ${pacienteExistenteId} vinculado al usuario ${usuarioId}`);
                 } else {
-                    console.warn(`⚠️ No se pudo vincular paciente ${pacienteExistenteId}`);
+                    console.warn(` No se pudo vincular paciente ${pacienteExistenteId}`);
                 }
             } else {
                 // CREAR nuevo paciente
@@ -313,7 +313,7 @@ router.post('/', async (req, res) => {
                         ubicacion?.direccion || null, null, null, 1
                     ]
                 );
-                console.log(`✅ Nuevo paciente creado: ${nuevoPacienteId}`);
+                console.log(` Nuevo paciente creado: ${nuevoPacienteId}`);
             }
         }
 
@@ -330,7 +330,7 @@ router.post('/', async (req, res) => {
         });
 
     } catch (err) {
-        console.error("❌ Error en registro:", err);
+        console.error(" Error en registro:", err);
         return res.status(500).json({ 
             error: true, 
             mensaje: 'Error al crear la cuenta: ' + err.message 

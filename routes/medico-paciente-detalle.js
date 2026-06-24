@@ -4,21 +4,21 @@ const router = express.Router();
 const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
-console.log('✅ [ROUTER] Cargando medico-paciente-detalle.js');
+console.log(' [ROUTER] Cargando medico-paciente-detalle.js');
 
-// 👇 Helper para parsear JSON de forma segura
+//  Helper para parsear JSON de forma segura
 function parsearCampoJSON(valor) {
   if (!valor) return null;
   if (typeof valor === 'object') return valor;
   try {
     return JSON.parse(valor);
   } catch (e) {
-    console.warn('⚠️ Error parseando JSON:', e.message);
+    console.warn(' Error parseando JSON:', e.message);
     return null;
   }
 }
 
-// 👇 Helper para formatear fecha MySQL → 'YYYY-MM-DD'
+//  Helper para formatear fecha MySQL → 'YYYY-MM-DD'
 function formatearFechaMySQL(fecha) {
   if (!fecha) return null;
   if (typeof fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
@@ -33,9 +33,9 @@ function formatearFechaMySQL(fecha) {
   return null;
 }
 
-// 🔍 Middleware de debug
+//  Middleware de debug
 router.use((req, res, next) => {
-  console.log('🔍 [DETALLE PACIENTE DEBUG]', {
+  console.log(' [DETALLE PACIENTE DEBUG]', {
     method: req.method,
     path: req.path,
     params: req.params,
@@ -50,7 +50,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
   const { paciente_id } = req.params;
   const usuario_id = req.usuario?.id;
 
-  console.log('🔍 [DETALLE PACIENTE] Solicitando datos para:', { paciente_id, usuario_id });
+  console.log(' [DETALLE PACIENTE] Solicitando datos para:', { paciente_id, usuario_id });
 
   if (!paciente_id) {
     return res.status(400).json({ error: true, mensaje: 'ID de paciente requerido' });
@@ -60,7 +60,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
   try {
     connection = await getConnection();
 
-    // 1️⃣ Datos básicos del paciente
+    //  Datos básicos del paciente
     const [paciente] = await connection.execute(
       `SELECT 
         p.id, 
@@ -81,7 +81,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
     );
 
     if (!paciente.length) {
-      console.warn('⚠️ [DETALLE PACIENTE] Paciente no encontrado:', paciente_id);
+      console.warn(' [DETALLE PACIENTE] Paciente no encontrado:', paciente_id);
       return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
     }
 
@@ -92,14 +92,14 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
       sexo: paciente[0].sexo ? String(paciente[0].sexo).trim() : null
     };
 
-    console.log('📤 [DETALLE PACIENTE] Datos del paciente:', {
+    console.log(' [DETALLE PACIENTE] Datos del paciente:', {
       id: pacienteFormateado.id,
       fecha_nacimiento: pacienteFormateado.fecha_nacimiento,
       sexo: pacienteFormateado.sexo,
       edad: pacienteFormateado.edad
     });
 
-    // 2️⃣ Historial de registros clínicos finalizados
+    //  Historial de registros clínicos finalizados
     const [registros] = await connection.execute(
       `SELECT 
         r.id, r.estado, r.fecha_inicio, r.fecha_finalizacion,
@@ -120,7 +120,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
       condiciones_metabolicas: parsearCampoJSON(reg.condiciones_metabolicas)
     }));
 
-    // 3️⃣ Últimos datos clínicos
+    //  Últimos datos clínicos
     const [ultimosSignos] = await connection.execute(
       `SELECT signos_vitales, datos_antropometricos, condiciones_metabolicas, fecha_finalizacion
        FROM registro
@@ -139,7 +139,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
       };
     }
 
-    console.log('✅ [DETALLE PACIENTE] Respuesta enviada exitosamente');
+    console.log(' [DETALLE PACIENTE] Respuesta enviada exitosamente');
 
     return res.json({
       error: false,
@@ -149,7 +149,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
     });
 
   } catch (err) {
-    console.error('❌ [DETALLE PACIENTE] Error:', err.message);
+    console.error(' [DETALLE PACIENTE] Error:', err.message);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al cargar datos del paciente: ' + err.message 
@@ -161,5 +161,5 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
   }
 });
 
-console.log('✅ [ROUTER] medico-paciente-detalle.js cargado correctamente');
+console.log(' [ROUTER] medico-paciente-detalle.js cargado correctamente');
 module.exports = router;

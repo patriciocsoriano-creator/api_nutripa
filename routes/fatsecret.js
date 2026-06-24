@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
-console.log('✅ [ROUTER] Cargando fatsecret.js (con SQLite USDA optimizado)');
+console.log(' [ROUTER] Cargando fatsecret.js (con SQLite USDA optimizado)');
 
 // ============================================================================
 // CONFIGURACIÓN
@@ -31,18 +31,18 @@ try {
     
     const totalFoods = usdaDb.prepare('SELECT COUNT(*) as count FROM foods').get().count;
     const totalNutrients = usdaDb.prepare('SELECT COUNT(*) as count FROM food_nutrients').get().count;
-    console.log(`✅ [USDA-SQLite] Base de datos cargada:`);
-    console.log(`   🍎 Alimentos: ${totalFoods.toLocaleString()}`);
-    console.log(`   🔬 Nutrientes: ${totalNutrients.toLocaleString()}`);
+    console.log(` [USDA-SQLite] Base de datos cargada:`);
+    console.log(`    Alimentos: ${totalFoods.toLocaleString()}`);
+    console.log(`    Nutrientes: ${totalNutrients.toLocaleString()}`);
   } else {
-    console.warn(`⚠️ [USDA-SQLite] DB no encontrada en: ${dbPath}`);
+    console.warn(` [USDA-SQLite] DB no encontrada en: ${dbPath}`);
   }
 } catch (e) {
-  console.error('❌ [USDA-SQLite] Error cargando:', e.message);
+  console.error(' [USDA-SQLite] Error cargando:', e.message);
 }
 
 if (!FATSECRET_CONFIG.consumer_key || !FATSECRET_CONFIG.consumer_secret) {
-  console.warn('⚠️ [FATSECRET] Credenciales NO configuradas. Usando USDA como fuente principal.');
+  console.warn(' [FATSECRET] Credenciales NO configuradas. Usando USDA como fuente principal.');
 }
 
 // Cliente OAuth
@@ -58,7 +58,7 @@ const oauthClient = oauth({
 });
 
 // ============================================================================
-// 📚 DICCIONARIO DE TRADUCCIÓN ESPAÑOL → INGLÉS (AMPLIADO)
+//  DICCIONARIO DE TRADUCCIÓN ESPAÑOL → INGLÉS (AMPLIADO)
 // ============================================================================
 const SPANISH_TO_ENGLISH = {
   // Proteínas animales
@@ -172,7 +172,7 @@ const SPANISH_TO_ENGLISH = {
 };
 
 // ============================================================================
-// 🔍 BÚSQUEDA EN SQLITE USDA (OPTIMIZADA)
+//  BÚSQUEDA EN SQLITE USDA (OPTIMIZADA)
 // ============================================================================
 function searchUsdaFoods(query, maxResults = 20) {
   if (!usdaDb) return [];
@@ -246,7 +246,7 @@ function searchUsdaFoods(query, maxResults = 20) {
       source: food.data_type === 'sr_legacy' ? 'usda_sr_legacy' : 'usda_foundation'
     }));
   } catch (e) {
-    console.error('❌ [USDA-SQLite] Error en búsqueda:', e.message);
+    console.error(' [USDA-SQLite] Error en búsqueda:', e.message);
     return [];
   }
 }
@@ -267,7 +267,7 @@ function round2(n) {
 // ENDPOINTS
 // ============================================================================
 
-// 🔐 Health check
+//  Health check
 router.get('/health', function(req, res) {
   let usdaInfo = { status: 'disabled', total_foods: 0 };
   
@@ -288,7 +288,7 @@ router.get('/health', function(req, res) {
   });
 });
 
-// 🔍 Buscar alimentos
+// Buscar alimentos
 router.post('/search', async function(req, res) {
   const { query, max_results = 10 } = req.body;
   const startTime = Date.now();
@@ -300,7 +300,7 @@ router.post('/search', async function(req, res) {
     });
   }
 
-  // 1️⃣ Intentar FatSecret API (si hay credenciales)
+  //  Intentar FatSecret API (si hay credenciales)
   if (FATSECRET_CONFIG.consumer_key && FATSECRET_CONFIG.consumer_secret) {
     try {
       const requestData = {
@@ -357,7 +357,7 @@ router.post('/search', async function(req, res) {
           }));
 
         const duration = Date.now() - startTime;
-        console.log(`✅ [FATSECRET] ${alimentos.length} alimentos para "${query}" (${duration}ms)`);
+        console.log(` [FATSECRET] ${alimentos.length} alimentos para "${query}" (${duration}ms)`);
         return res.json({
           error: false,
           query: query,
@@ -368,17 +368,17 @@ router.post('/search', async function(req, res) {
         });
       }
     } catch (err) {
-      console.warn(`⚠️ [FATSECRET] Error para "${query}": ${err.message}. Intentando USDA...`);
+      console.warn(` [FATSECRET] Error para "${query}": ${err.message}. Intentando USDA...`);
     }
   }
 
-  // 2️⃣ Buscar en SQLite de USDA (8,116 alimentos)
+  //  Buscar en SQLite de USDA (8,116 alimentos)
   if (usdaDb) {
     const usdaResults = searchUsdaFoods(query, max_results);
     
     if (usdaResults.length > 0) {
       const duration = Date.now() - startTime;
-      console.log(`✅ [USDA-SQLite] ${usdaResults.length} alimentos para "${query}" (${duration}ms)`);
+      console.log(` [USDA-SQLite] ${usdaResults.length} alimentos para "${query}" (${duration}ms)`);
       return res.json({
         error: false,
         query: query,
@@ -390,10 +390,10 @@ router.post('/search', async function(req, res) {
     }
   }
 
-  // 3️⃣ Fallback final: mockDB
+  //  Fallback final: mockDB
   const mockResults = getMockFoods(query, max_results);
   const duration = Date.now() - startTime;
-  console.log(`⚠️ [FALLBACK] mockDB para "${query}" (${duration}ms)`);
+  console.log(` [FALLBACK] mockDB para "${query}" (${duration}ms)`);
   
   return res.json({
     error: false,
@@ -406,7 +406,7 @@ router.post('/search', async function(req, res) {
 });
 
 // ============================================================================
-// 🎭 FALLBACK: MOCKDB (AMPLIADO)
+//  FALLBACK: MOCKDB (AMPLIADO)
 // ============================================================================
 function getMockFoods(query, maxResults) {
   const queryLower = query.toLowerCase().trim();
@@ -554,5 +554,5 @@ const mockDB = {
   ]
 };
 
-console.log('✅ [ROUTER] fatsecret.js cargado con SQLite USDA optimizado');
+console.log(' [ROUTER] fatsecret.js cargado con SQLite USDA optimizado');
 module.exports = router;

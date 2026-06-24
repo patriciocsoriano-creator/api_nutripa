@@ -1,5 +1,5 @@
 // routes/admin-ubicaciones.js - GESTIÓN DE UBICACIONES GEOGRÁFICAS
-console.log('✅ [ROUTER] Cargando admin-ubicaciones.js');
+console.log(' [ROUTER] Cargando admin-ubicaciones.js');
 
 const express = require('express');
 const router = express.Router();
@@ -7,7 +7,7 @@ const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 
 // ========================================
-// 📍 POBLAR UBICACIONES DE ECUADOR
+//  POBLAR UBICACIONES DE ECUADOR
 // POST /nutricionapp-api/admin/ubicaciones/poblar
 // ========================================
 router.post('/poblar', verificarToken, verificarRol('admin'), async (req, res) => {
@@ -22,14 +22,14 @@ router.post('/poblar', verificarToken, verificarRol('admin'), async (req, res) =
     connection = await getConnection();
     
     for (const prov of provincias) {
-      // 1️⃣ Insertar/Actualizar provincia
+      //  Insertar/Actualizar provincia
       await connection.execute(
         `INSERT INTO provincias (codigo, nombre) VALUES (?, ?) 
          ON DUPLICATE KEY UPDATE nombre = VALUES(nombre)`,
         [prov.codigo, prov.nombre]
       );
       
-      // 2️⃣ Insertar/Actualizar cantones
+      //  Insertar/Actualizar cantones
       if (prov.cantones && Array.isArray(prov.cantones)) {
         for (const canton of prov.cantones) {
           await connection.execute(
@@ -38,7 +38,7 @@ router.post('/poblar', verificarToken, verificarRol('admin'), async (req, res) =
             [canton.codigo, canton.nombre, prov.codigo]
           );
           
-          // 3️⃣ Insertar/Actualizar parroquias
+          //  Insertar/Actualizar parroquias
           if (canton.parroquias && Array.isArray(canton.parroquias)) {
             for (const parroquia of canton.parroquias) {
               await connection.execute(
@@ -52,7 +52,7 @@ router.post('/poblar', verificarToken, verificarRol('admin'), async (req, res) =
       }
     }
     
-    console.log('✅ [ADMIN] Ubicaciones de Ecuador pobladas exitosamente');
+    console.log(' [ADMIN] Ubicaciones de Ecuador pobladas exitosamente');
     
     return res.json({
       error: false,
@@ -61,7 +61,7 @@ router.post('/poblar', verificarToken, verificarRol('admin'), async (req, res) =
     });
     
   } catch (err) {
-    console.error('❌ [ADMIN] Error poblando ubicaciones:', err.message);
+    console.error(' [ADMIN] Error poblando ubicaciones:', err.message);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al poblar ubicaciones: ' + err.message 
@@ -74,7 +74,7 @@ router.post('/poblar', verificarToken, verificarRol('admin'), async (req, res) =
 });
 
 // ========================================
-// 📊 ESTADÍSTICAS DE UBICACIONES
+//  ESTADÍSTICAS DE UBICACIONES
 // GET /nutricionapp-api/admin/ubicaciones/stats
 // ========================================
 router.get('/stats', verificarToken, verificarRol('admin', 'doctor', 'nutricionista'), async (req, res) => {
@@ -95,7 +95,7 @@ router.get('/stats', verificarToken, verificarRol('admin', 'doctor', 'nutricioni
       }
     });
   } catch (err) {
-    console.error('❌ [ADMIN] Error en stats ubicaciones:', err.message);
+    console.error(' [ADMIN] Error en stats ubicaciones:', err.message);
     return res.status(500).json({ error: true, mensaje: err.message });
   } finally {
     if (connection) {
@@ -105,7 +105,7 @@ router.get('/stats', verificarToken, verificarRol('admin', 'doctor', 'nutricioni
 });
 
 // ========================================
-// 📋 LISTAR PROVINCIAS (para frontend)
+//  LISTAR PROVINCIAS (para frontend)
 // GET /nutricionapp-api/admin/ubicaciones/provincias
 // ========================================
 router.get('/provincias', async (req, res) => {
@@ -131,7 +131,7 @@ router.get('/provincias', async (req, res) => {
 });
 
 // ========================================
-// 📋 LISTAR CANTONES POR PROVINCIA
+//  LISTAR CANTONES POR PROVINCIA
 // GET /nutricionapp-api/admin/ubicaciones/cantones/:provinciaCodigo
 // ========================================
 router.get('/cantones/:provinciaCodigo', async (req, res) => {
@@ -161,7 +161,7 @@ router.get('/cantones/:provinciaCodigo', async (req, res) => {
 });
 
 // ========================================
-// 📋 LISTAR PARROQUIAS POR CANTÓN
+//  LISTAR PARROQUIAS POR CANTÓN
 // GET /nutricionapp-api/admin/ubicaciones/parroquias/:cantonCodigo
 // ========================================
 router.get('/parroquias/:cantonCodigo', async (req, res) => {
@@ -190,5 +190,5 @@ router.get('/parroquias/:cantonCodigo', async (req, res) => {
   }
 });
 
-console.log('✅ [ROUTER] admin-ubicaciones.js cargado correctamente');
+console.log(' [ROUTER] admin-ubicaciones.js cargado correctamente');
 module.exports = router;

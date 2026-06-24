@@ -9,12 +9,12 @@ const crypto = require('crypto');
 
 const SECRET = process.env.JWT_SECRET || 'dev_secret_change_in_prod_2026';
 
-// 🔐 Función para hashear token (SHA-256)
+//  Función para hashear token (SHA-256)
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-// 👇 Helper para registrar historial de acceso
+//  Helper para registrar historial de acceso
 async function registrarAcceso(connection, datos) {
   try {
     await connection.execute(
@@ -32,11 +32,11 @@ async function registrarAcceso(connection, datos) {
       ]
     );
   } catch (err) {
-    console.warn('⚠️ [HISTORIAL] Error registrando acceso:', err.message);
+    console.warn(' [HISTORIAL] Error registrando acceso:', err.message);
   }
 }
 
-// 👇 Helper para guardar sesión
+//  Helper para guardar sesión
 async function guardarSesion(connection, datos) {
   try {
     await connection.execute(
@@ -54,14 +54,14 @@ async function guardarSesion(connection, datos) {
     );
     return true;
   } catch (err) {
-    console.warn('⚠️ [SESION] Error guardando sesión:', err.message);
+    console.warn(' [SESION] Error guardando sesión:', err.message);
     return false;
   }
 }
 
 // POST /nutricionapp-api/login
 router.post('/', async (req, res) => {
-  console.log('🔐 [LOGIN] Request:', { 
+  console.log(' [LOGIN] Request:', { 
     email: req.body?.email, 
     ip: req.ip,
     userAgent: req.get('user-agent')?.substring(0, 50) 
@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
   const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
   const userAgent = req.get('user-agent') || '';
 
-  // 🔍 Validación básica
+  //  Validación básica
   if (!email || !password) {
     return res.status(400).json({ 
       error: true, 
@@ -83,10 +83,10 @@ router.post('/', async (req, res) => {
   try {
     //  Obtener conexión del pool
     connection = await getConnection();
-    console.log('🔗 [LOGIN] Conexión obtenida del pool');
+    console.log(' [LOGIN] Conexión obtenida del pool');
     
     //  Buscar usuario por correo (case-insensitive)
-    console.log('🔍 [LOGIN] Buscando usuario...');
+    console.log(' [LOGIN] Buscando usuario...');
     const [usuarios] = await connection.execute(
       `SELECT 
          u.id, u.correo, u.password_hash, u.nombre, u.apellido, 
@@ -98,9 +98,9 @@ router.post('/', async (req, res) => {
       [email.toLowerCase().trim()]
     );
 
-    // ❌ Usuario no encontrado
+    //  Usuario no encontrado
     if (usuarios.length === 0) {
-      console.warn('⚠️ [LOGIN] Usuario no encontrado:', email);
+      console.warn(' [LOGIN] Usuario no encontrado:', email);
       await registrarAcceso(connection, {
         correo_intentado: email,
         ip_address: ipAddress,
@@ -115,18 +115,18 @@ router.post('/', async (req, res) => {
     }
 
     const usuario = usuarios[0];
-    console.log('👤 [LOGIN] Usuario encontrado:', { 
+    console.log(' [LOGIN] Usuario encontrado:', { 
       id: usuario.id, 
       rol_nombre: usuario.rol_nombre,  //  Verificar este valor
       activo: usuario.activo 
     });
 
-    // 🔐 3️⃣ Validar contraseña
-    console.log('🔐 [LOGIN] Validando contraseña...');
+    // Validar contraseña
+    console.log('[LOGIN] Validando contraseña...');
     const esValida = await bcrypt.compare(password, usuario.password_hash);
     
     if (!esValida) {
-      console.warn('⚠️ [LOGIN] Contraseña incorrecta para:', email);
+      console.warn('[LOGIN] Contraseña incorrecta para:', email);
       await registrarAcceso(connection, {
         usuario_id: usuario.id,
         ip_address: ipAddress,
@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
 
     //  Verificar que el usuario esté activo
     if (!usuario.activo) {
-      console.warn('⚠️ [LOGIN] Usuario inactivo:', email);
+      console.warn(' [LOGIN] Usuario inactivo:', email);
       await registrarAcceso(connection, {
         usuario_id: usuario.id,
         ip_address: ipAddress,
@@ -157,17 +157,17 @@ router.post('/', async (req, res) => {
     }
 
     //  Registrar acceso exitoso en historial
-    console.log('📝 [LOGIN] Registrando acceso exitoso...');
+    console.log(' [LOGIN] Registrando acceso exitoso...');
     await registrarAcceso(connection, {
       usuario_id: usuario.id,
       ip_address: ipAddress,
       user_agent: userAgent,
       exito: true
     });
-    console.log('✅ [LOGIN] Historial actualizado');
+    console.log(' [LOGIN] Historial actualizado');
 
     // Generar JWT Access Token
-    console.log('🎫 [LOGIN] Generando tokens...');
+    console.log(' [LOGIN] Generando tokens...');
     const token = jwt.sign(
       { 
         usuario_id: usuario.id, 
@@ -182,7 +182,7 @@ router.post('/', async (req, res) => {
       }
     );
 
-    // 🔁 Generar Refresh Token
+    // Generar Refresh Token
     const refreshToken = jwt.sign(
       { usuario_id: usuario.id, type: 'refresh' },
       SECRET + '_refresh_secret',
@@ -192,12 +192,12 @@ router.post('/', async (req, res) => {
       }
     );
 
-    // 🔐 Hashear tokens antes de guardar en BD
+    //  Hashear tokens antes de guardar en BD
     const tokenHash = hashToken(token);
     const refreshTokenHash = hashToken(refreshToken);
 
-    // 💾 7️⃣ Guardar sesión en base de datos
-    console.log('💾 [LOGIN] Guardando sesión...');
+    //  Guardar sesión en base de datos
+    console.log(' [LOGIN] Guardando sesión...');
     const sesionGuardada = await guardarSesion(connection, {
       usuario_id: usuario.id,
       token_hash: tokenHash,
@@ -207,21 +207,21 @@ router.post('/', async (req, res) => {
     });
     
     if (sesionGuardada) {
-      console.log('✅ [LOGIN] Sesión guardada en BD');
+      console.log(' [LOGIN] Sesión guardada en BD');
     } else {
-      console.warn('⚠️ [LOGIN] Sesión NO guardada (login continúa)');
+      console.warn(' [LOGIN] Sesión NO guardada (login continúa)');
     }
 
-    // 📤 8️⃣ Preparar respuesta exitosa - ✅ CORREGIDO: mapear rol_nombre → rol
+    //  Preparar respuesta exitosa -  CORREGIDO: mapear rol_nombre → rol
     const { password_hash, ...usuarioSinPassword } = usuario;
     
-    // 👇 IMPORTANTE: El frontend espera "rol", pero la BD devuelve "rol_nombre"
+    //  IMPORTANTE: El frontend espera "rol", pero la BD devuelve "rol_nombre"
     const usuarioRespuesta = {
       ...usuarioSinPassword,
       rol: usuario.rol_nombre || usuario.rol || 'desconocido'  // ← Mapeo explícito
     };
     
-    console.log('📤 [LOGIN] Enviando respuesta:', {
+    console.log(' [LOGIN] Enviando respuesta:', {
       mensaje: 'Login exitoso',
       usuario: {
         id: usuarioRespuesta.id,
@@ -240,8 +240,8 @@ router.post('/', async (req, res) => {
     });
 
   } catch (err) {
-    // ❌ Manejo de errores
-    console.error('💥 [LOGIN] ERROR CRÍTICO:', {
+    //  Manejo de errores
+    console.error(' [LOGIN] ERROR CRÍTICO:', {
       message: err.message,
       code: err.code,
       errno: err.errno,
@@ -270,13 +270,13 @@ router.post('/', async (req, res) => {
     });
     
   } finally {
-    // 🔓 9️⃣ Liberar conexión al pool
+    // Liberar conexión al pool
     if (connection) {
       try {
         await connection.release();
-        console.log('🔓 [LOGIN] Conexión liberada al pool');
+        console.log(' [LOGIN] Conexión liberada al pool');
       } catch (releaseErr) {
-        console.error('❌ [LOGIN] Error liberando conexión:', releaseErr.message);
+        console.error(' [LOGIN] Error liberando conexión:', releaseErr.message);
       }
     }
   }
@@ -339,7 +339,7 @@ router.post('/refresh', async (req, res) => {
     });
     
   } catch (err) {
-    console.error('❌ [REFRESH] Error:', err.message);
+    console.error(' [REFRESH] Error:', err.message);
     
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: true, mensaje: 'Refresh token expirado' });

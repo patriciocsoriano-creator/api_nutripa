@@ -5,15 +5,15 @@ const { getConnection } = require('../conexion');
 const { verificarToken, verificarRol } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 
-console.log('✅ [ROUTER] Cargando paciente-glucosa.js');
+console.log(' [ROUTER] Cargando paciente-glucosa.js');
 
 // Middleware: solo pacientes autenticados
 router.use(verificarToken);
 router.use(verificarRol('paciente'));
 
 // ============================================================================
-// 🩸 POST /nutricionapp-api/paciente/glucosa/registrar
-// 👉 Registrar nueva medición de glucosa
+//  POST /nutricionapp-api/paciente/glucosa/registrar
+//  Registrar nueva medición de glucosa
 // ============================================================================
 router.post('/registrar', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -58,7 +58,7 @@ router.post('/registrar', async (req, res) => {
       [medicionId, pacienteId, fechaMedicion, tipo_momento, valor_glucosa, notas || null]
     );
 
-    console.log(`🩸 [GLUCOSA] Medición registrada: ${valor_glucosa} mg/dL (${tipo_momento}) para paciente ${pacienteId}`);
+    console.log(` [GLUCOSA] Medición registrada: ${valor_glucosa} mg/dL (${tipo_momento}) para paciente ${pacienteId}`);
 
     // Determinar clasificación de la glucosa
     let clasificacion = 'normal';
@@ -91,7 +91,7 @@ router.post('/registrar', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [GLUCOSA] Error:', err);
+    console.error(' [GLUCOSA] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al registrar la medición: ' + err.message 
@@ -104,8 +104,8 @@ router.post('/registrar', async (req, res) => {
 });
 
 // ============================================================================
-// 📊 GET /nutricionapp-api/paciente/glucosa/historial
-// 👉 Obtener historial de mediciones de glucosa
+// GET /nutricionapp-api/paciente/glucosa/historial
+// Obtener historial de mediciones de glucosa
 // ============================================================================
 router.get('/historial', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -158,7 +158,7 @@ router.get('/historial', async (req, res) => {
       maximo = Math.max(...valores);
     }
 
-    console.log(`📊 [GLUCOSA] Historial cargado: ${totalMediciones} mediciones para paciente ${pacienteId}`);
+    console.log(` [GLUCOSA] Historial cargado: ${totalMediciones} mediciones para paciente ${pacienteId}`);
 
     return res.status(200).json({
       error: false,
@@ -173,7 +173,7 @@ router.get('/historial', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [GLUCOSA] Error:', err);
+    console.error(' [GLUCOSA] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener historial: ' + err.message 
@@ -186,8 +186,8 @@ router.get('/historial', async (req, res) => {
 });
 
 // ============================================================================
-// 📈 GET /nutricionapp-api/paciente/glucosa/estadisticas
-// 👉 Obtener estadísticas resumidas (últimos 7 días)
+//  GET /nutricionapp-api/paciente/glucosa/estadisticas
+//  Obtener estadísticas resumidas (últimos 7 días)
 // ============================================================================
 router.get('/estadisticas', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -245,7 +245,7 @@ router.get('/estadisticas', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [GLUCOSA] Error:', err);
+    console.error(' [GLUCOSA] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener estadísticas' 
@@ -258,8 +258,8 @@ router.get('/estadisticas', async (req, res) => {
 });
 
 // ============================================================================
-// 🗑️ DELETE /nutricionapp-api/paciente/glucosa/:id
-// 👉 Eliminar una medición
+//  DELETE /nutricionapp-api/paciente/glucosa/:id
+//  Eliminar una medición
 // ============================================================================
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
@@ -283,7 +283,7 @@ router.delete('/:id', async (req, res) => {
 
     await connection.execute(`DELETE FROM mediciones_glucosa WHERE id = ?`, [id]);
 
-    console.log(`🗑️ [GLUCOSA] Medición eliminada: ${id}`);
+    console.log(` [GLUCOSA] Medición eliminada: ${id}`);
 
     return res.status(200).json({
       error: false,
@@ -291,7 +291,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [GLUCOSA] Error:', err);
+    console.error(' [GLUCOSA] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al eliminar la medición' 
@@ -311,8 +311,8 @@ router.delete('/:id', async (req, res) => {
 
 
 // ============================================================================
-// 🫀 POST /nutricionapp-api/paciente/presion/registrar
-// 👉 Registrar nueva medición de presión arterial
+//  POST /nutricionapp-api/paciente/presion/registrar
+// Registrar nueva medición de presión arterial
 // ============================================================================
 router.post('/presion/registrar', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -382,7 +382,7 @@ router.post('/presion/registrar', async (req, res) => {
       ]
     );
 
-    console.log(`🫀 [PRESION] Medición registrada: ${sistolica}/${diastolica} para paciente ${pacienteId}`);
+    console.log(` [PRESION] Medición registrada: ${sistolica}/${diastolica} para paciente ${pacienteId}`);
 
     // Clasificación según AHA
     let clasificacion = 'normal';
@@ -392,7 +392,7 @@ router.post('/presion/registrar', async (req, res) => {
 
     if (sis > 180 || dia > 120) {
       clasificacion = 'crisis';
-      mensaje_clasificacion = '⚠️ CRISIS HIPERTENSIVA - Busca atención médica inmediata';
+      mensaje_clasificacion = ' CRISIS HIPERTENSIVA - Busca atención médica inmediata';
     } else if (sis >= 140 || dia >= 90) {
       clasificacion = 'alta_etapa2';
       mensaje_clasificacion = 'Hipertensión Etapa 2 - Consulta con tu médico';
@@ -404,7 +404,7 @@ router.post('/presion/registrar', async (req, res) => {
       mensaje_clasificacion = 'Presión elevada - Cambios en el estilo de vida';
     } else {
       clasificacion = 'normal';
-      mensaje_clasificacion = '✅ Presión normal - Mantén tus hábitos saludables';
+      mensaje_clasificacion = ' Presión normal - Mantén tus hábitos saludables';
     }
 
     return res.status(201).json({
@@ -416,7 +416,7 @@ router.post('/presion/registrar', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PRESION] Error:', err);
+    console.error(' [PRESION] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al registrar la medición: ' + err.message 
@@ -429,8 +429,8 @@ router.post('/presion/registrar', async (req, res) => {
 });
 
 // ============================================================================
-// 🫀 GET /nutricionapp-api/paciente/presion/historial
-// 👉 Obtener historial de mediciones de presión arterial
+//  GET /nutricionapp-api/paciente/presion/historial
+//  Obtener historial de mediciones de presión arterial
 // ============================================================================
 router.get('/presion/historial', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -508,7 +508,7 @@ router.get('/presion/historial', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PRESION] Error:', err);
+    console.error(' [PRESION] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al obtener historial: ' + err.message 
@@ -521,8 +521,8 @@ router.get('/presion/historial', async (req, res) => {
 });
 
 // ============================================================================
-// 🗑️ DELETE /nutricionapp-api/paciente/presion/:id
-// 👉 Eliminar una medición de presión
+// DELETE /nutricionapp-api/paciente/presion/:id
+// Eliminar una medición de presión
 // ============================================================================
 router.delete('/presion/:id', async (req, res) => {
   const { id } = req.params;
@@ -545,7 +545,7 @@ router.delete('/presion/:id', async (req, res) => {
 
     await connection.execute(`DELETE FROM mediciones_presion WHERE id = ?`, [id]);
 
-    console.log(`🗑️ [PRESION] Medición eliminada: ${id}`);
+    console.log(` [PRESION] Medición eliminada: ${id}`);
 
     return res.status(200).json({
       error: false,
@@ -553,7 +553,7 @@ router.delete('/presion/:id', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ [PRESION] Error:', err);
+    console.error(' [PRESION] Error:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al eliminar la medición' 
@@ -565,5 +565,5 @@ router.delete('/presion/:id', async (req, res) => {
   }
 });
 
-console.log('✅ [ROUTER] paciente-glucosa.js cargado correctamente');
+console.log(' [ROUTER] paciente-glucosa.js cargado correctamente');
 module.exports = router;
