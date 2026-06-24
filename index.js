@@ -27,7 +27,8 @@ app.use('/nutricionapp-api/recuperar', require('./routes/recuperar'));
 // ========================================
 app.use('/nutricionapp-api/enfermeria/registro', require('./routes/enfermeriaregistro'));
 app.use('/nutricionapp-api/enfermeria', require('./routes/enfermeria-panel'));
-
+app.use('/nutricionapp-api/enfermeria/pacientes', require('./routes/enfermeriabuscarpaciente'));
+app.use('/nutricionapp-api/enfermeria/reportes', require('./routes/enfermeriareportes'));
 // ========================================
 // MEDICO (ORDEN IMPORTANTE: Especifico antes que general)
 // ========================================
