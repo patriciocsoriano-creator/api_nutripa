@@ -63,12 +63,11 @@ router.get('/estadisticas', verificarToken, verificarRol('enfermera', 'nutricion
       porcentajeIniciados: total > 0 ? Math.round((iniciados / total) * 100) : 0
     };
 
-    // Query de registros recientes
+    // Query de registros recientes - CORREGIDO: sin r.progreso
     const registrosQuery = `
       SELECT 
         r.id,
         r.estado,
-        r.progreso,
         r.creado_en as fecha_registro,
         p.nombres,
         p.apellidos,
@@ -83,20 +82,37 @@ router.get('/estadisticas', verificarToken, verificarRol('enfermera', 'nutricion
 
     const [registrosResult] = await connection.execute(registrosQuery, params);
 
+    // Calcular progreso basado en el estado
+    const registros = registrosResult.map(registro => {
+      let progreso = 0;
+      if (registro.estado === 'finalizado') {
+        progreso = 100;
+      } else if (registro.estado === 'en_proceso') {
+        progreso = 50;
+      } else if (registro.estado === 'iniciado') {
+        progreso = 10;
+      }
+
+      return {
+        ...registro,
+        progreso: progreso
+      };
+    });
+
     console.log(`[INFORMES] Estadisticas cargadas: ${total} registros en el periodo`);
 
     return res.status(200).json({
       error: false,
       mensaje: 'Informes cargados exitosamente',
       estadisticas: estadisticas,
-      registros: registrosResult
+      registros: registros
     });
 
   } catch (error) {
     console.error('[INFORMES] Error:', error);
     return res.status(500).json({
       error: true,
-      mensaje: 'Error al cargar informes'
+      mensaje: 'Error al cargar informes: ' + error.message
     });
   } finally {
     if (connection) {
@@ -133,7 +149,6 @@ router.get('/exportar', verificarToken, verificarRol('enfermera', 'nutricionista
       SELECT 
         r.id,
         r.estado,
-        r.progreso,
         r.creado_en as fecha_registro,
         p.nombres,
         p.apellidos,
@@ -158,13 +173,23 @@ router.get('/exportar', verificarToken, verificarRol('enfermera', 'nutricionista
       const csvRows = [headers.join(',')];
 
       rows.forEach(row => {
+        // Calcular progreso basado en el estado
+        let progreso = 0;
+        if (row.estado === 'finalizado') {
+          progreso = 100;
+        } else if (row.estado === 'en_proceso') {
+          progreso = 50;
+        } else if (row.estado === 'iniciado') {
+          progreso = 10;
+        }
+
         const rowData = [
           row.id,
           `"${row.nombre_paciente}"`,
           row.cedula_paciente,
           row.telefono || '',
           row.estado,
-          row.progreso || 0,
+          progreso,
           row.fecha_registro
         ];
         csvRows.push(rowData.join(','));
@@ -183,10 +208,20 @@ router.get('/exportar', verificarToken, verificarRol('enfermera', 'nutricionista
       report += `--------------------\n\n`;
 
       rows.forEach((row, index) => {
+        // Calcular progreso basado en el estado
+        let progreso = 0;
+        if (row.estado === 'finalizado') {
+          progreso = 100;
+        } else if (row.estado === 'en_proceso') {
+          progreso = 50;
+        } else if (row.estado === 'iniciado') {
+          progreso = 10;
+        }
+
         report += `${index + 1}. ${row.nombre_paciente}\n`;
         report += `   Cedula: ${row.cedula_paciente}\n`;
         report += `   Estado: ${row.estado}\n`;
-        report += `   Progreso: ${row.progreso || 0}%\n`;
+        report += `   Progreso: ${progreso}%\n`;
         report += `   Fecha: ${row.fecha_registro}\n\n`;
       });
 
