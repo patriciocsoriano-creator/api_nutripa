@@ -255,7 +255,7 @@ router.post('/', async (req, res) => {
         }
         const rol_id = roles[0].id;
 
-        const password_hash = await bcrypt.hash(password, 10);
+        const password_hash = await bcrypt.hash(password, 8);
         const usuarioId = uuidv4();
 
         // Crear usuario
