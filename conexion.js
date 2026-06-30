@@ -82,6 +82,12 @@ async function closePool() {
   console.log(' [CONEXION] Pool cerrado');
 }
 
+function getPool() {
+  return pool;
+}
+
+module.exports.getPool = getPool;
+
 app.get('/', (req, res) => {
   res.json({
     status: 'OK',
