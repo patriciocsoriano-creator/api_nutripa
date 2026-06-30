@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 
-console.log('🔗 [CONEXION] Iniciando conexión inmediata a BD...');
+console.log(' [CONEXION] Iniciando conexión inmediata a BD...');
 
 const app = express();
 
@@ -29,7 +29,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 //  POOL MySQL - Se crea INMEDIATAMENTE al cargar este módulo
-console.log('🗄️ [CONEXION] Creando pool de conexiones...');
+console.log(' [CONEXION] Creando pool de conexiones...');
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',  // IP para evitar problemas DNS en Windows
@@ -97,4 +97,11 @@ app.get('/', (req, res) => {
 });
 
 console.log(' [CONEXION] Módulo exportado (pool inicializado)');
-module.exports = { getConnection, query, closePool, app, pool };
+module.exports = {
+  getConnection,
+  query,
+  closePool,
+  app,
+  pool,
+  getPool
+};
