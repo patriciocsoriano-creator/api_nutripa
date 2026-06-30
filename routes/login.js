@@ -4,12 +4,11 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const { getPool } = require('../conexion');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 
 const SECRET = process.env.JWT_SECRET || 'dev_secret_change_in_prod_2026';
 
-//  Hash token
+// Hash token
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
@@ -22,7 +21,7 @@ async function registrarAcceso(pool, data) {
        (id, usuario_id, correo_intentado, ip_address, user_agent, exito, motivo_fallo)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        uuidv4(),
+        crypto.randomUUID(), //  Cambié uuidv4() por crypto.randomUUID() (más rápido)
         data.usuario_id || null,
         data.correo_intentado || null,
         data.ip_address,
@@ -36,7 +35,7 @@ async function registrarAcceso(pool, data) {
   }
 }
 
-//  Guardar sesión (NO bloqueante)
+// Guardar sesión (NO bloqueante)
 async function guardarSesion(pool, data) {
   try {
     await pool.query(
@@ -44,7 +43,7 @@ async function guardarSesion(pool, data) {
        (id, usuario_id, token_hash, refresh_token_hash, ip_address, user_agent, fecha_expiracion)
        VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
       [
-        uuidv4(),
+        crypto.randomUUID(), //  Cambié uuidv4() por crypto.randomUUID()
         data.usuario_id,
         data.token_hash,
         data.refresh_token_hash,
@@ -56,7 +55,7 @@ async function guardarSesion(pool, data) {
 }
 
 // ==========================
-//  LOGIN PRINCIPAL
+// LOGIN PRINCIPAL
 // ==========================
 router.post('/', async (req, res) => {
   const { email, password } = req.body;
@@ -84,7 +83,8 @@ router.post('/', async (req, res) => {
     );
 
     if (rows.length === 0) {
-      await registrarAcceso(pool, {
+      //  CAMBIO CRÍTICO: Quité el await - ahora es fire-and-forget
+      registrarAcceso(pool, {
         correo_intentado: email,
         ip_address: ip,
         user_agent: userAgent,
@@ -100,11 +100,12 @@ router.post('/', async (req, res) => {
 
     const usuario = rows[0];
 
-    //  bcrypt (CPU costoso, pero necesario)
+    // bcrypt (CPU costoso, pero necesario)
     const passwordOk = await bcrypt.compare(password, usuario.password_hash);
 
     if (!passwordOk) {
-      await registrarAcceso(pool, {
+      //  CAMBIO CRÍTICO: Quité el await - ahora es fire-and-forget
+      registrarAcceso(pool, {
         usuario_id: usuario.id,
         ip_address: ip,
         user_agent: userAgent,
@@ -125,7 +126,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    //  traer rol SOLO cuando ya autenticó (reduce carga DB)
+    // traer rol SOLO cuando ya autenticó (reduce carga DB)
     const [rolRow] = await pool.query(
       `SELECT nombre FROM roles WHERE id = ? LIMIT 1`,
       [usuario.rol_id]
@@ -133,7 +134,7 @@ router.post('/', async (req, res) => {
 
     const rol = rolRow[0]?.nombre || 'desconocido';
 
-    //  log éxito (fire and forget)
+    //  Ya estaba bien: fire and forget (sin await)
     registrarAcceso(pool, {
       usuario_id: usuario.id,
       ip_address: ip,
@@ -141,7 +142,7 @@ router.post('/', async (req, res) => {
       exito: true
     });
 
-    //  JWT Access Token
+    // JWT Access Token
     const token = jwt.sign(
       {
         usuario_id: usuario.id,
@@ -152,7 +153,7 @@ router.post('/', async (req, res) => {
       { expiresIn: '8h' }
     );
 
-    //  Refresh Token
+    // Refresh Token
     const refreshToken = jwt.sign(
       {
         usuario_id: usuario.id,
@@ -162,7 +163,7 @@ router.post('/', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    //  guardar sesión async (no bloquea respuesta)
+    //  Ya estaba bien: fire and forget (sin await)
     guardarSesion(pool, {
       usuario_id: usuario.id,
       token_hash: hashToken(token),
@@ -171,7 +172,7 @@ router.post('/', async (req, res) => {
       user_agent: userAgent
     });
 
-    //  RESPUESTA FINAL
+    // RESPUESTA FINAL
     return res.json({
       error: false,
       mensaje: 'Login exitoso',
@@ -198,7 +199,7 @@ router.post('/', async (req, res) => {
 });
 
 // ==========================
-//  REFRESH TOKEN OPTIMIZADO
+// REFRESH TOKEN OPTIMIZADO
 // ==========================
 router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body;
