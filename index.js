@@ -80,6 +80,14 @@ app.get('/nutricionapp-api/health', (req, res) => {
 });
 
 // ========================================
+// LOADER.IO VERIFICATION
+// ========================================
+app.get('/loaderio-4c0e2a6df7ea9d53da3bde6bd70714de.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('loaderio-4c0e2a6df7ea9d53da3bde6bd70714de');
+});
+
+// ========================================
 // 404 HANDLER
 // ========================================
 app.use((req, res) => {
