@@ -1,7 +1,7 @@
 // backend/routes/login.js - OPTIMIZADO PARA ALTA CONCURRENCIA (HOSPITAL)
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const { getPool } = require('../conexion');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
