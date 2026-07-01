@@ -558,5 +558,202 @@ router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), a
   }
 });
 
+
+
+// ============================================================================
+//  PUT /nutricionapp-api/paciente/plan/confirmar-cita/:citaId
+//  Confirmar asistencia a una cita
+// ============================================================================
+router.put('/confirmar-cita/:citaId', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+  const citaId = req.params.citaId;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
+
+    // Verificar que la cita pertenece al paciente
+    const [citas] = await connection.execute(
+      `SELECT id, estado, fecha_hora 
+       FROM seguimiento_citas 
+       WHERE id = ? AND paciente_id = ?`,
+      [citaId, pacienteId]
+    );
+
+    if (citas.length === 0) {
+      return res.status(404).json({ error: true, mensaje: 'Cita no encontrada' });
+    }
+
+    const cita = citas[0];
+
+    // Verificar que la cita esté en estado válido para confirmar
+    if (!['agendada', 'confirmada'].includes(cita.estado)) {
+      return res.status(400).json({ 
+        error: true, 
+        mensaje: 'Esta cita no se puede confirmar (estado: ' + cita.estado + ')' 
+      });
+    }
+
+    // Actualizar estado a confirmada
+    await connection.execute(
+      `UPDATE seguimiento_citas 
+       SET estado = 'confirmada', 
+           fecha_confirmacion = NOW()
+       WHERE id = ?`,
+      [citaId]
+    );
+
+    console.log(` [CITA] Cita ${citaId} confirmada por paciente ${pacienteId}`);
+
+    return res.status(200).json({
+      error: false,
+      mensaje: 'Cita confirmada exitosamente',
+      cita: {
+        id: citaId,
+        estado: 'confirmada',
+        fecha_confirmacion: new Date()
+      }
+    });
+
+  } catch (err) {
+    console.error(' [CITA] Error confirmando cita:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al confirmar la cita' 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+//  PUT /nutricionapp-api/paciente/plan/cancelar-cita/:citaId
+//  Cancelar cita del paciente
+// ============================================================================
+router.put('/cancelar-cita/:citaId', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+  const citaId = req.params.citaId;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
+
+    // Verificar que la cita pertenece al paciente
+    const [citas] = await connection.execute(
+      `SELECT id, estado, fecha_hora 
+       FROM seguimiento_citas 
+       WHERE id = ? AND paciente_id = ?`,
+      [citaId, pacienteId]
+    );
+
+    if (citas.length === 0) {
+      return res.status(404).json({ error: true, mensaje: 'Cita no encontrada' });
+    }
+
+    const cita = citas[0];
+
+    // Verificar que la cita esté en estado válido para cancelar
+    if (!['agendada', 'confirmada'].includes(cita.estado)) {
+      return res.status(400).json({ 
+        error: true, 
+        mensaje: 'Esta cita no se puede cancelar (estado: ' + cita.estado + ')' 
+      });
+    }
+
+    // Actualizar estado a cancelada
+    await connection.execute(
+      `UPDATE seguimiento_citas 
+       SET estado = 'cancelada', 
+           fecha_cancelacion = NOW()
+       WHERE id = ?`,
+      [citaId]
+    );
+
+    console.log(` [CITA] Cita ${citaId} cancelada por paciente ${pacienteId}`);
+
+    return res.status(200).json({
+      error: false,
+      mensaje: 'Cita cancelada exitosamente'
+    });
+
+  } catch (err) {
+    console.error(' [CITA] Error cancelando cita:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al cancelar la cita' 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+//  GET /nutricionapp-api/paciente/plan/historial-citas
+//  Obtener historial de citas del paciente
+// ============================================================================
+router.get('/historial-citas', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+  
+  let connection;
+  try {
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.status(200).json({ error: false, total: 0, citas: [] });
+    }
+
+    // Obtener todas las citas del paciente
+    const [citas] = await connection.execute(
+      `SELECT 
+        sc.id,
+        sc.fecha_hora,
+        sc.tipo,
+        sc.motivo,
+        sc.estado,
+        sc.fecha_confirmacion,
+        sc.fecha_cancelacion,
+        CONCAT(u.nombre, ' ', u.apellido) as medico_nombre
+       FROM seguimiento_citas sc
+       INNER JOIN usuarios u ON u.id = sc.medico_id
+       WHERE sc.paciente_id = ?
+       ORDER BY sc.fecha_hora DESC`,
+      [pacienteId]
+    );
+
+    return res.status(200).json({
+      error: false,
+      total: citas.length,
+      citas: citas
+    });
+
+  } catch (err) {
+    console.error(' [CITA] Error obteniendo historial:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener historial de citas' 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+
 console.log(' [ROUTER] paciente-plan.js cargado correctamente');
 module.exports = router;

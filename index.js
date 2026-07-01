@@ -181,3 +181,8 @@ app.listen(PORT, () => {
   console.log(`    - GET  /nutricionapp-api/health`);
   console.log(`\n[SERVER] Tip: Usa dns.setDefaultResultOrder('ipv4first') para evitar ENOTFOUND en Windows`);
 });
+
+//  INICIALIZAR CRON JOBS (TAREAS PROGRAMADAS)
+// ========================================
+require('./cron-jobs');  //  SOLO ESTA LÍNEA
+console.log('[SERVER] Cron jobs inicializados');
