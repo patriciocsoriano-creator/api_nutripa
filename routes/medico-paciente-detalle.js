@@ -161,5 +161,229 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
   }
 });
 
+
+// ============================================================================
+//  GET /nutricionapp-api/medico/paciente/:pacienteId/registro/:registroId
+//  Obtener detalle de un registro clínico específico
+// ============================================================================
+router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('medico', 'nutricionista'), async (req, res) => {
+  const { pacienteId, registroId } = req.params;
+  const medicoId = req.usuario?.id;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // Verificar que el paciente existe y está asignado al médico
+    const [asignacion] = await connection.execute(
+      `SELECT id FROM pacientes WHERE id = ? AND eliminado_en IS NULL`,
+      [pacienteId]
+    );
+
+    if (asignacion.length === 0) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
+
+    // Obtener el registro completo
+    const [registros] = await connection.execute(
+      `SELECT 
+        r.id,
+        r.paciente_id,
+        r.medico_id,
+        r.fecha_finalizacion,
+        r.observaciones,
+        r.datos_antropometricos,
+        r.signos_vitales,
+        r.condiciones_metabolicas,
+        r.creado_en,
+        u.nombre as registrado_por_nombre,
+        u.apellido as registrado_por_apellido
+       FROM registros_clinicos r
+       LEFT JOIN usuarios u ON u.id = r.medico_id
+       WHERE r.id = ? AND r.paciente_id = ?`,
+      [registroId, pacienteId]
+    );
+
+    if (registros.length === 0) {
+      return res.status(404).json({ error: true, mensaje: 'Registro no encontrado' });
+    }
+
+    // Parsear JSONs si vienen como string
+    const registro = registros[0];
+    if (typeof registro.datos_antropometricos === 'string') {
+      registro.datos_antropometricos = JSON.parse(registro.datos_antropometricos);
+    }
+    if (typeof registro.signos_vitales === 'string') {
+      registro.signos_vitales = JSON.parse(registro.signos_vitales);
+    }
+    if (typeof registro.condiciones_metabolicas === 'string') {
+      registro.condiciones_metabolicas = JSON.parse(registro.condiciones_metabolicas);
+    }
+
+    // Obtener info del paciente
+    const [pacientes] = await connection.execute(
+      `SELECT 
+        id,
+        nombres,
+        apellidos,
+        cedula,
+        numero_identificacion,
+        edad,
+        sexo,
+        telefono,
+        direccion
+       FROM pacientes
+       WHERE id = ?`,
+      [pacienteId]
+    );
+
+    const paciente = pacientes[0] || null;
+
+    console.log(`[MEDICO] Registro ${registroId} consultado para paciente ${pacienteId}`);
+
+    return res.status(200).json({
+      error: false,
+      registro,
+      paciente
+    });
+
+  } catch (err) {
+    console.error('[MEDICO] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener registro: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+//  GET /nutricionapp-api/medico/paciente/:pacienteId/glucosa
+//  Obtener mediciones de glucosa del paciente
+// ============================================================================
+router.get('/:pacienteId/glucosa', verificarToken, verificarRol('medico', 'nutricionista'), async (req, res) => {
+  const { pacienteId } = req.params;
+  const { dias = 30 } = req.query;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    const [mediciones] = await connection.execute(
+      `SELECT 
+        id,
+        fecha_hora,
+        tipo_momento,
+        valor_glucosa,
+        unidad,
+        notas,
+        creado_en
+       FROM mediciones_glucosa
+       WHERE paciente_id = ?
+         AND fecha_hora >= DATE_SUB(NOW(), INTERVAL ? DAY)
+       ORDER BY fecha_hora DESC`,
+      [pacienteId, parseInt(dias)]
+    );
+
+    // Calcular estadísticas
+    let estadisticas = null;
+    if (mediciones.length > 0) {
+      const valores = mediciones.map(m => parseFloat(m.valor_glucosa));
+      estadisticas = {
+        total: mediciones.length,
+        promedio: valores.reduce((a, b) => a + b, 0) / valores.length,
+        minimo: Math.min(...valores),
+        maximo: Math.max(...valores)
+      };
+    }
+
+    return res.status(200).json({
+      error: false,
+      mediciones,
+      estadisticas
+    });
+
+  } catch (err) {
+    console.error('[MEDICO] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener mediciones: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+//  GET /nutricionapp-api/medico/paciente/:pacienteId/presion
+//  Obtener mediciones de presión arterial del paciente
+// ============================================================================
+router.get('/:pacienteId/presion', verificarToken, verificarRol('medico', 'nutricionista'), async (req, res) => {
+  const { pacienteId } = req.params;
+  const { dias = 30 } = req.query;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    const [mediciones] = await connection.execute(
+      `SELECT 
+        id,
+        fecha_hora,
+        sistolica,
+        diastolica,
+        pulso,
+        posicion,
+        brazo,
+        notas,
+        creado_en
+       FROM mediciones_presion
+       WHERE paciente_id = ?
+         AND fecha_hora >= DATE_SUB(NOW(), INTERVAL ? DAY)
+       ORDER BY fecha_hora DESC`,
+      [pacienteId, parseInt(dias)]
+    );
+
+    // Calcular estadísticas
+    let estadisticas = null;
+    if (mediciones.length > 0) {
+      const sistolicas = mediciones.map(m => parseFloat(m.sistolica));
+      const diastolicas = mediciones.map(m => parseFloat(m.diastolica));
+      
+      estadisticas = {
+        total: mediciones.length,
+        promedio_sistolica: sistolicas.reduce((a, b) => a + b, 0) / sistolicas.length,
+        promedio_diastolica: diastolicas.reduce((a, b) => a + b, 0) / diastolicas.length,
+        minimo_sistolica: Math.min(...sistolicas),
+        maximo_sistolica: Math.max(...sistolicas),
+        minimo_diastolica: Math.min(...diastolicas),
+        maximo_diastolica: Math.max(...diastolicas)
+      };
+    }
+
+    return res.status(200).json({
+      error: false,
+      mediciones,
+      estadisticas
+    });
+
+  } catch (err) {
+    console.error('[MEDICO] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener mediciones: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
 console.log(' [ROUTER] medico-paciente-detalle.js cargado correctamente');
 module.exports = router;
