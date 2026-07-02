@@ -754,6 +754,120 @@ router.get('/historial-citas', async (req, res) => {
   }
 });
 
+// ============================================================================
+//  GET /nutricionapp-api/paciente/plan/historial-medico
+//  Obtener historial médico completo del paciente
+// ============================================================================
+// ============================================================================
+//  GET /nutricionapp-api/paciente/plan/historial-medico
+//  Obtener historial médico completo del paciente
+// ============================================================================
+router.get('/historial-medico', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // Obtener paciente_id
+    const [paciente] = await connection.execute(
+      `SELECT id FROM pacientes WHERE usuario_id = ? AND activo = 1 AND eliminado_en IS NULL`,
+      [usuarioId]
+    );
+
+    if (paciente.length === 0) {
+      return res.status(200).json({ 
+        error: false, 
+        historial: null,
+        mensaje: 'No tienes un perfil de paciente asociado'
+      });
+    }
+
+    const pacienteId = paciente[0].id;
+
+    // 1. Obtener evoluciones
+    const [evoluciones] = await connection.execute(
+      `SELECT 
+        id,
+        fecha,
+        objetivos_alcanzados as objetivos,
+        observaciones_clinicas as observaciones,
+        adherencia,
+        creado_en
+       FROM evoluciones
+       WHERE paciente_id = ?
+       ORDER BY fecha DESC
+       LIMIT 50`,
+      [pacienteId]
+    );
+
+    // 2. Obtener citas
+    const [citas] = await connection.execute(
+      `SELECT 
+        id,
+        fecha_hora,
+        tipo,
+        motivo,
+        estado,
+        creado_en
+       FROM citas
+       WHERE paciente_id = ?
+       ORDER BY fecha_hora DESC
+       LIMIT 50`,
+      [pacienteId]
+    );
+
+    // 3. Obtener mediciones de glucosa (estructura real)
+    const [mediciones_glucosa] = await connection.execute(
+      `SELECT 
+        id,
+        fecha_hora as fecha,
+        tipo_momento,
+        valor_glucosa,
+        unidad,
+        notas as observaciones,
+        creado_en
+       FROM mediciones_glucosa
+       WHERE paciente_id = ?
+       ORDER BY fecha_hora DESC
+       LIMIT 50`,
+      [pacienteId]
+    );
+
+    // 4. Obtener última medición de glucosa
+    let ultima_medicion_glucosa = null;
+    if (mediciones_glucosa.length > 0) {
+      ultima_medicion_glucosa = mediciones_glucosa[0];
+    }
+
+    console.log(`[HISTORIAL] Historial cargado para paciente ${pacienteId}:`);
+    console.log(`  - Evoluciones: ${evoluciones.length}`);
+    console.log(`  - Citas: ${citas.length}`);
+    console.log(`  - Mediciones glucosa: ${mediciones_glucosa.length}`);
+
+    return res.status(200).json({
+      error: false,
+      historial: {
+        evoluciones,
+        citas,
+        mediciones_glucosa,
+        ultima_medicion_glucosa
+      }
+    });
+
+  } catch (err) {
+    console.error('[HISTORIAL] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener historial médico: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
 
 console.log(' [ROUTER] paciente-plan.js cargado correctamente');
 module.exports = router;
