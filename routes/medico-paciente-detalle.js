@@ -166,11 +166,7 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
 //  GET /nutricionapp-api/medico/paciente/:pacienteId/registro/:registroId
 //  Obtener detalle de un registro clínico específico
 // ============================================================================
-// ============================================================================
-//  GET /nutricionapp-api/medico/paciente/:pacienteId/registro/:registroId
-//  Obtener detalle de un registro clínico específico
-// ============================================================================
-router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('medico', 'nutricionista'), async (req, res) => {
+router.get('/:pacienteId/registro/:registroId', verificarToken, async (req, res) => {
   const { pacienteId, registroId } = req.params;
   
   console.log('[MEDICO] Consultando registro:', { pacienteId, registroId });
@@ -179,17 +175,7 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
   try {
     connection = await getConnection();
 
-    // 1. Verificar que el paciente existe
-    const [pacientes] = await connection.execute(
-      `SELECT id FROM pacientes WHERE id = ? AND eliminado_en IS NULL`,
-      [pacienteId]
-    );
-
-    if (pacientes.length === 0) {
-      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
-    }
-
-    // 2. Obtener el registro (usando 'registrado_por' en lugar de 'medico_id')
+    // 1. Obtener el registro con info del usuario que lo registró
     const [registros] = await connection.execute(
       `SELECT 
         r.id,
@@ -218,7 +204,7 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
 
     const registro = registros[0];
 
-    // 3. Parsear TODOS los campos JSON
+    // 2. Parsear campos JSON
     const camposJson = ['datos_personales', 'signos_vitales', 'datos_antropometricos', 'condiciones_metabolicas'];
     
     for (const campo of camposJson) {
@@ -232,20 +218,24 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
       }
     }
 
-    // 4. Obtener info del paciente
+    // 3. Obtener info del paciente con JOIN a usuarios para obtener la cédula
     const [pacienteInfo] = await connection.execute(
       `SELECT 
-        id,
-        nombres,
-        apellidos,
-        cedula,
-        numero_identificacion,
-        edad,
-        sexo,
-        telefono,
-        direccion
-       FROM pacientes
-       WHERE id = ?`,
+        p.id,
+        p.nombres,
+        p.apellidos,
+        p.numero_identificacion,
+        p.fecha_nacimiento,
+        p.sexo,
+        p.telefono,
+        p.direccion,
+        p.ocupacion,
+        p.actividad_fisica,
+        u.cedula,
+        TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) as edad
+       FROM pacientes p
+       LEFT JOIN usuarios u ON u.id = p.usuario_id
+       WHERE p.id = ?`,
       [pacienteId]
     );
 
@@ -263,8 +253,7 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
     console.error('[MEDICO] Error:', err);
     return res.status(500).json({ 
       error: true, 
-      mensaje: 'Error al obtener registro: ' + err.message,
-      detalle: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      mensaje: 'Error al obtener registro: ' + err.message
     });
   } finally {
     if (connection) {
@@ -272,7 +261,6 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
     }
   }
 });
-
 // ============================================================================
 //  GET /nutricionapp-api/medico/paciente/:pacienteId/glucosa
 //  Obtener mediciones de glucosa del paciente
