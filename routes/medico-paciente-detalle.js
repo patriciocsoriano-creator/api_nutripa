@@ -166,40 +166,48 @@ router.get('/:paciente_id/detalle', verificarToken, verificarRol('doctor', 'nutr
 //  GET /nutricionapp-api/medico/paciente/:pacienteId/registro/:registroId
 //  Obtener detalle de un registro clínico específico
 // ============================================================================
+// ============================================================================
+//  GET /nutricionapp-api/medico/paciente/:pacienteId/registro/:registroId
+//  Obtener detalle de un registro clínico específico
+// ============================================================================
 router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('medico', 'nutricionista'), async (req, res) => {
   const { pacienteId, registroId } = req.params;
-  const medicoId = req.usuario?.id;
+  
+  console.log('[MEDICO] Consultando registro:', { pacienteId, registroId });
 
   let connection;
   try {
     connection = await getConnection();
 
-    // Verificar que el paciente existe y está asignado al médico
-    const [asignacion] = await connection.execute(
+    // 1. Verificar que el paciente existe
+    const [pacientes] = await connection.execute(
       `SELECT id FROM pacientes WHERE id = ? AND eliminado_en IS NULL`,
       [pacienteId]
     );
 
-    if (asignacion.length === 0) {
+    if (pacientes.length === 0) {
       return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
     }
 
-    // Obtener el registro completo
+    // 2. Obtener el registro (usando 'registrado_por' en lugar de 'medico_id')
     const [registros] = await connection.execute(
       `SELECT 
         r.id,
         r.paciente_id,
-        r.medico_id,
+        r.registrado_por,
+        r.estado,
+        r.datos_personales,
+        r.signos_vitales,
+        r.datos_antropometricos,
+        r.condiciones_metabolicas,
+        r.fecha_inicio,
         r.fecha_finalizacion,
         r.observaciones,
-        r.datos_antropometricos,
-        r.signos_vitales,
-        r.condiciones_metabolicas,
         r.creado_en,
         u.nombre as registrado_por_nombre,
         u.apellido as registrado_por_apellido
-       FROM registros_clinicos r
-       LEFT JOIN usuarios u ON u.id = r.medico_id
+       FROM registro r
+       LEFT JOIN usuarios u ON u.id = r.registrado_por
        WHERE r.id = ? AND r.paciente_id = ?`,
       [registroId, pacienteId]
     );
@@ -208,20 +216,24 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
       return res.status(404).json({ error: true, mensaje: 'Registro no encontrado' });
     }
 
-    // Parsear JSONs si vienen como string
     const registro = registros[0];
-    if (typeof registro.datos_antropometricos === 'string') {
-      registro.datos_antropometricos = JSON.parse(registro.datos_antropometricos);
-    }
-    if (typeof registro.signos_vitales === 'string') {
-      registro.signos_vitales = JSON.parse(registro.signos_vitales);
-    }
-    if (typeof registro.condiciones_metabolicas === 'string') {
-      registro.condiciones_metabolicas = JSON.parse(registro.condiciones_metabolicas);
+
+    // 3. Parsear TODOS los campos JSON
+    const camposJson = ['datos_personales', 'signos_vitales', 'datos_antropometricos', 'condiciones_metabolicas'];
+    
+    for (const campo of camposJson) {
+      if (registro[campo] && typeof registro[campo] === 'string') {
+        try {
+          registro[campo] = JSON.parse(registro[campo]);
+        } catch (e) {
+          console.warn(`[MEDICO] Error parseando ${campo}:`, e.message);
+          registro[campo] = null;
+        }
+      }
     }
 
-    // Obtener info del paciente
-    const [pacientes] = await connection.execute(
+    // 4. Obtener info del paciente
+    const [pacienteInfo] = await connection.execute(
       `SELECT 
         id,
         nombres,
@@ -237,9 +249,9 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
       [pacienteId]
     );
 
-    const paciente = pacientes[0] || null;
+    const paciente = pacienteInfo[0] || null;
 
-    console.log(`[MEDICO] Registro ${registroId} consultado para paciente ${pacienteId}`);
+    console.log(`[MEDICO] Registro ${registroId} consultado exitosamente`);
 
     return res.status(200).json({
       error: false,
@@ -251,7 +263,8 @@ router.get('/:pacienteId/registro/:registroId', verificarToken, verificarRol('me
     console.error('[MEDICO] Error:', err);
     return res.status(500).json({ 
       error: true, 
-      mensaje: 'Error al obtener registro: ' + err.message 
+      mensaje: 'Error al obtener registro: ' + err.message,
+      detalle: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   } finally {
     if (connection) {
