@@ -869,5 +869,214 @@ router.get('/historial-medico', async (req, res) => {
 });
 
 
+// ============================================================================
+//  GET /nutricionapp-api/paciente/plan/perfil
+//  Obtener perfil completo del paciente
+// ============================================================================
+router.get('/perfil', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // Obtener datos del usuario
+    const [usuarios] = await connection.execute(
+      `SELECT 
+        id,
+        correo,
+        nombre,
+        apellido,
+        cedula,
+        fecha_nacimiento,
+        edad,
+        genero,
+        telefono,
+        direccionresidencial,
+        ciudad,
+        provincia,
+        provincia_codigo,
+        canton,
+        canton_codigo,
+        parroquia,
+        parroquia_codigo,
+        creado_en
+       FROM usuarios
+       WHERE id = ? AND activo = 1 AND eliminado_en IS NULL`,
+      [usuarioId]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(404).json({ 
+        error: true, 
+        mensaje: 'Usuario no encontrado' 
+      });
+    }
+
+    const usuario = usuarios[0];
+
+    const perfil = {
+      id: usuario.id,
+      correo: usuario.correo,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      cedula: usuario.cedula,
+      fecha_nacimiento: usuario.fecha_nacimiento,
+      edad: usuario.edad,
+      genero: usuario.genero,
+      telefono: usuario.telefono,
+      direccion: usuario.direccionresidencial || '',
+      ciudad: usuario.ciudad || '',
+      provincia: usuario.provincia || '',
+      provincia_codigo: usuario.provincia_codigo || '',
+      canton: usuario.canton || '',
+      canton_codigo: usuario.canton_codigo || '',
+      parroquia: usuario.parroquia || '',
+      parroquia_codigo: usuario.parroquia_codigo || ''
+    };
+
+    console.log(`[PERFIL] Perfil cargado para usuario ${usuarioId}`);
+
+    return res.status(200).json({
+      error: false,
+      perfil
+    });
+
+  } catch (err) {
+    console.error('[PERFIL] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener perfil: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
+// ============================================================================
+//  PUT /nutricionapp-api/paciente/plan/perfil
+//  Actualizar perfil del paciente
+// ============================================================================
+router.put('/perfil', async (req, res) => {
+  const usuarioId = req.usuario?.id;
+  const {
+    genero,
+    telefono,
+    correo,
+    direccion,
+    ciudad,
+    provincia,
+    provincia_codigo,
+    canton,
+    canton_codigo,
+    parroquia,
+    parroquia_codigo,
+    passwordActual,
+    nuevaPassword
+  } = req.body;
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // Verificar que el usuario existe
+    const [usuarios] = await connection.execute(
+      `SELECT id, password_hash FROM usuarios WHERE id = ? AND activo = 1 AND eliminado_en IS NULL`,
+      [usuarioId]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(404).json({ 
+        error: true, 
+        mensaje: 'Usuario no encontrado' 
+      });
+    }
+
+    // Si se está cambiando la contraseña, verificar la actual
+    if (nuevaPassword && passwordActual) {
+      const bcrypt = require('bcrypt');
+      const passwordValida = await bcrypt.compare(passwordActual, usuarios[0].password_hash);
+      
+      if (!passwordValida) {
+        return res.status(400).json({ 
+          error: true, 
+          mensaje: 'La contraseña actual es incorrecta' 
+        });
+      }
+
+      // Validar nueva contraseña
+      if (nuevaPassword.length < 8) {
+        return res.status(400).json({ 
+          error: true, 
+          mensaje: 'La nueva contraseña debe tener al menos 8 caracteres' 
+        });
+      }
+
+      // Hashear la nueva contraseña
+      const salt = await bcrypt.genSalt(10);
+      const passwordHasheada = await bcrypt.hash(nuevaPassword, salt);
+
+      await connection.execute(
+        `UPDATE usuarios SET password_hash = ?, actualizado_en = NOW() WHERE id = ?`,
+        [passwordHasheada, usuarioId]
+      );
+
+      console.log(`[PERFIL] Contraseña actualizada para usuario ${usuarioId}`);
+    }
+
+    // Actualizar datos del perfil
+    await connection.execute(
+      `UPDATE usuarios SET 
+        genero = ?,
+        telefono = ?,
+        correo = ?,
+        direccionresidencial = ?,
+        ciudad = ?,
+        provincia = ?,
+        provincia_codigo = ?,
+        canton = ?,
+        canton_codigo = ?,
+        parroquia = ?,
+        parroquia_codigo = ?,
+        actualizado_en = NOW()
+       WHERE id = ?`,
+      [
+        genero || null,
+        telefono || null,
+        correo || null,
+        direccion || null,
+        ciudad || null,
+        provincia || null,
+        provincia_codigo || null,
+        canton || null,
+        canton_codigo || null,
+        parroquia || null,
+        parroquia_codigo || null,
+        usuarioId
+      ]
+    );
+
+    console.log(`[PERFIL] Perfil actualizado para usuario ${usuarioId}`);
+
+    return res.status(200).json({
+      error: false,
+      mensaje: 'Perfil actualizado correctamente'
+    });
+
+  } catch (err) {
+    console.error('[PERFIL] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al actualizar perfil: ' + err.message 
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
 console.log(' [ROUTER] paciente-plan.js cargado correctamente');
 module.exports = router;
