@@ -130,7 +130,7 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
 
     const conversacion = {
       medico_id: medico.medico_id,
-      nombre_paciente: medico.nombre_medico,
+      nombre_medico: medico.nombre_medico,
       telefono_medico: medico.telefono_medico,
       ultimo_mensaje: mensajeRows.length > 0 ? mensajeRows[0].ultimo_mensaje : 'Inicia una conversacion con tu medico',
       ultimo_mensaje_fecha: mensajeRows.length > 0 ? mensajeRows[0].ultimo_mensaje_fecha : null,
