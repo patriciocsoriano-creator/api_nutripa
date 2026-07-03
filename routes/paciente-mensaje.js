@@ -1,8 +1,7 @@
-// routes/paciente-mensaje.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../conexion').pool;
-const verificarToken = require('../middlewares/verificarToken');
+const { verificarToken } = require('../middlewares/verificarToken');
 
 // ========================================
 // OBTENER CONVERSACION CON EL MEDICO ASIGNADO
@@ -11,7 +10,6 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
   try {
     const pacienteId = req.usuario.id;
 
-    // Buscar el medico asignado al paciente
     const [medicoRows] = await pool.query(`
       SELECT 
         m.id AS medico_id,
@@ -35,7 +33,6 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
 
     const medico = medicoRows[0];
 
-    // Obtener ultimo mensaje de la conversacion
     const [mensajeRows] = await pool.query(`
       SELECT 
         contenido AS ultimo_mensaje,
@@ -47,7 +44,6 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
       LIMIT 1
     `, [medico.medico_id, pacienteId]);
 
-    // Contar mensajes no leidos (del medico al paciente)
     const [noLeidosRows] = await pool.query(`
       SELECT COUNT(*) AS total
       FROM mensajes
@@ -128,7 +124,6 @@ router.post('/mensajes/enviar', verificarToken, async (req, res) => {
       });
     }
 
-    // Verificar que el medico esta asignado al paciente
     const [asignacionRows] = await pool.query(`
       SELECT id FROM asignaciones
       WHERE medico_id = ? AND paciente_id = ? AND estado = 'activo'

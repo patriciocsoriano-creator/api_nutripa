@@ -1,8 +1,7 @@
-// routes/medico-mensajes.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../conexion').pool;
-const verificarToken = require('../middlewares/verificarToken');
+const { verificarToken } = require('../middlewares/verificarToken');
 
 // ========================================
 // OBTENER CONVERSACIONES (LISTA DE PACIENTES)
@@ -145,12 +144,13 @@ router.put('/mensajes/leidos/:pacienteId', verificarToken, async (req, res) => {
 });
 
 // ========================================
-// NOTIFICACIONES NO LEIDAS
+// NOTIFICACIONES NO LEIDAS (CONFIRMACIONES DE CITAS)
 // ========================================
 router.get('/notificaciones/no-leidas', verificarToken, async (req, res) => {
   try {
     const medicoId = req.usuario.id;
 
+    // Contar mensajes no leidos del medico
     const [rows] = await pool.query(`
       SELECT COUNT(*) AS total
       FROM mensajes
