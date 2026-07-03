@@ -42,6 +42,7 @@ app.use('/nutricionapp-api/medico/informes', require('./routes/medicoinformes'))
 app.use('/nutricionapp-api/medico/perfil', require('./routes/medico-perfil'));
 app.use('/nutricionapp-api/medico', require('./routes/medico-mensajes')); 
 app.use('/nutricionapp-api/medico', require('./routes/medico-notificaciones'));
+app.use('/nutricionapp-api/medico', require('./routes/medico-citas'));
 // ========================================
 // APIs EXTERNAS
 // ========================================
