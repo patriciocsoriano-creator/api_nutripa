@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../conexion').pool;
-const { verificarToken } = require('../middlewares/verificarToken');
+const { verificarToken } = require('../middleware/auth');
 
 // ========================================
 // OBTENER CONVERSACION CON EL MEDICO ASIGNADO

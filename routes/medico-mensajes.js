@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../conexion').pool;
-const { verificarToken } = require('../middlewares/verificarToken');
+const { verificarToken } = require('../middleware/auth');
 
 // ========================================
 // OBTENER CONVERSACIONES (LISTA DE PACIENTES)
@@ -22,7 +22,7 @@ router.get('/mensajes/conversaciones', verificarToken, async (req, res) => {
         SELECT 
           paciente_id,
           contenido AS ultimo_mensaje,
-          fecha AS ultimo_mensaje_fecha,
+          MAX(fecha) AS ultimo_mensaje_fecha,
           SUM(CASE WHEN es_medico = 0 AND leido = 0 THEN 1 ELSE 0 END) AS mensajes_no_leidos
         FROM mensajes
         WHERE medico_id = ?
@@ -144,13 +144,12 @@ router.put('/mensajes/leidos/:pacienteId', verificarToken, async (req, res) => {
 });
 
 // ========================================
-// NOTIFICACIONES NO LEIDAS (CONFIRMACIONES DE CITAS)
+// NOTIFICACIONES NO LEIDAS
 // ========================================
 router.get('/notificaciones/no-leidas', verificarToken, async (req, res) => {
   try {
     const medicoId = req.usuario.id;
 
-    // Contar mensajes no leidos del medico
     const [rows] = await pool.query(`
       SELECT COUNT(*) AS total
       FROM mensajes
