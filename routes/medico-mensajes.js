@@ -18,17 +18,18 @@ router.get('/mensajes/conversaciones', verificarToken, async (req, res) => {
         m.ultimo_mensaje_fecha,
         m.mensajes_no_leidos
       FROM usuarios u
+      INNER JOIN roles r ON u.rol_id = r.id
       INNER JOIN (
         SELECT 
           paciente_id,
-          contenido AS ultimo_mensaje,
+          SUBSTRING_INDEX(GROUP_CONCAT(contenido ORDER BY fecha DESC), ',', 1) AS ultimo_mensaje,
           MAX(fecha) AS ultimo_mensaje_fecha,
           SUM(CASE WHEN es_medico = 0 AND leido = 0 THEN 1 ELSE 0 END) AS mensajes_no_leidos
         FROM mensajes
         WHERE medico_id = ?
         GROUP BY paciente_id
       ) m ON u.id = m.paciente_id
-      WHERE u.rol = 'paciente'
+      WHERE r.nombre = 'paciente'
       ORDER BY m.ultimo_mensaje_fecha DESC
     `, [medicoId]);
 
@@ -41,7 +42,8 @@ router.get('/mensajes/conversaciones', verificarToken, async (req, res) => {
     console.error('[ERROR CONVERSACIONES]', error);
     res.status(500).json({
       error: true,
-      mensaje: 'Error al obtener conversaciones'
+      mensaje: 'Error al obtener conversaciones',
+      detalle: error.message
     });
   }
 });
