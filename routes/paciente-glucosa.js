@@ -104,13 +104,13 @@ router.post('/registrar', async (req, res) => {
 });
 
 
+
 // ============================================================================
 // GET /nutricionapp-api/paciente/glucosa/historial
-// Obtener historial de mediciones de glucosa
 // ============================================================================
 router.get('/historial', async (req, res) => {
   const usuarioId = req.usuario?.id;
-  const { dias = 30, limit = 50 } = req.query;
+  const { dias = 365, limit = 100 } = req.query;
 
   console.log('[GLUCOSA HISTORIAL] Usuario:', usuarioId, 'Dias:', dias, 'Limit:', limit);
 
@@ -118,26 +118,21 @@ router.get('/historial', async (req, res) => {
   try {
     connection = await getConnection();
 
-    // Obtener paciente_id
     const [paciente] = await connection.execute(
       `SELECT id FROM pacientes WHERE usuario_id = ? AND activo = 1 AND eliminado_en IS NULL`,
       [usuarioId]
     );
 
     if (paciente.length === 0) {
-      console.warn('[GLUCOSA HISTORIAL] Paciente no encontrado para usuario:', usuarioId);
-      return res.status(200).json({ error: false, mediciones: [], total: 0, estadisticas: null });
+      return res.status(200).json({ error: false, mediciones: [], estadisticas: null });
     }
 
     const pacienteId = paciente[0].id;
-    console.log('[GLUCOSA HISTORIAL] Paciente ID:', pacienteId);
+    const diasNum = parseInt(dias) || 365;
+    const limitNum = parseInt(limit) || 100;
 
-    // Validar parámetros
-    const diasNum = parseInt(dias) || 30;
-    const limitNum = parseInt(limit) || 50;
-
-    // Obtener mediciones de los últimos X días
-    const [mediciones] = await connection.execute(
+    // IMPORTANTE: Usar query() en lugar de execute() para evitar ER_WRONG_ARGUMENTS
+    const [mediciones] = await connection.query(
       `SELECT 
         id,
         fecha_hora,
@@ -148,21 +143,16 @@ router.get('/historial', async (req, res) => {
         creado_en
        FROM mediciones_glucosa
        WHERE paciente_id = ?
-         AND fecha_hora >= DATE_SUB(NOW(), INTERVAL ? DAY)
+         AND fecha_hora >= DATE_SUB(NOW(), INTERVAL ${diasNum} DAY)
        ORDER BY fecha_hora DESC
-       LIMIT ?`,
-      [pacienteId, diasNum, limitNum]
+       LIMIT ${limitNum}`,
+      [pacienteId]
     );
 
     console.log('[GLUCOSA HISTORIAL] Mediciones encontradas:', mediciones.length);
 
-    // Calcular estadísticas
-    let promedio = 0;
-    let minimo = 0;
-    let maximo = 0;
-    let totalMediciones = mediciones.length;
-
-    if (totalMediciones > 0) {
+    let promedio = 0, minimo = 0, maximo = 0;
+    if (mediciones.length > 0) {
       const valores = mediciones.map(m => parseFloat(m.valor_glucosa));
       promedio = valores.reduce((a, b) => a + b, 0) / valores.length;
       minimo = Math.min(...valores);
@@ -173,7 +163,7 @@ router.get('/historial', async (req, res) => {
       error: false,
       mediciones,
       estadisticas: {
-        total: totalMediciones,
+        total: mediciones.length,
         promedio: parseFloat(promedio.toFixed(1)),
         minimo,
         maximo,
@@ -182,23 +172,14 @@ router.get('/historial', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[GLUCOSA HISTORIAL] Error:', {
-      message: err.message,
-      code: err.code,
-      sqlState: err.sqlState,
-      sql: err.sql
-    });
-    return res.status(500).json({ 
-      error: true, 
-      mensaje: 'Error al obtener historial: ' + err.message 
-    });
+    console.error('[GLUCOSA HISTORIAL] Error:', err.message);
+    return res.status(500).json({ error: true, mensaje: 'Error al obtener historial: ' + err.message });
   } finally {
     if (connection) {
       try { connection.release(); } catch (e) {}
     }
   }
 });
-
 
 // ============================================================================
 //  GET /nutricionapp-api/paciente/glucosa/estadisticas
@@ -444,8 +425,7 @@ router.post('/presion/registrar', async (req, res) => {
 });
 
 // ============================================================================
-//  GET /nutricionapp-api/paciente/presion/historial
-//  Obtener historial de mediciones de presión arterial
+// GET /nutricionapp-api/paciente/glucosa/presion/historial
 // ============================================================================
 router.get('/presion/historial', async (req, res) => {
   const usuarioId = req.usuario?.id;
@@ -463,18 +443,15 @@ router.get('/presion/historial', async (req, res) => {
     );
 
     if (paciente.length === 0) {
-      console.warn('[PRESION HISTORIAL] Paciente no encontrado para usuario:', usuarioId);
       return res.status(200).json({ error: false, mediciones: [], estadisticas: null });
     }
 
     const pacienteId = paciente[0].id;
-    console.log('[PRESION HISTORIAL] Paciente ID:', pacienteId);
-
-    // Validar parámetros
     const diasNum = parseInt(dias) || 365;
     const limitNum = parseInt(limit) || 100;
 
-    const [mediciones] = await connection.execute(
+    // IMPORTANTE: Usar query() en lugar de execute()
+    const [mediciones] = await connection.query(
       `SELECT 
         id,
         fecha_hora,
@@ -487,21 +464,17 @@ router.get('/presion/historial', async (req, res) => {
         creado_en
        FROM mediciones_presion
        WHERE paciente_id = ?
-         AND fecha_hora >= DATE_SUB(NOW(), INTERVAL ? DAY)
+         AND fecha_hora >= DATE_SUB(NOW(), INTERVAL ${diasNum} DAY)
        ORDER BY fecha_hora DESC
-       LIMIT ?`,
-      [pacienteId, diasNum, limitNum]
+       LIMIT ${limitNum}`,
+      [pacienteId]
     );
 
     console.log('[PRESION HISTORIAL] Mediciones encontradas:', mediciones.length);
 
-    // Calcular estadísticas
-    let promedioSistolica = 0;
-    let promedioDiastolica = 0;
-    let minimoSistolica = 0;
-    let maximoSistolica = 0;
-    let minimoDiastolica = 0;
-    let maximoDiastolica = 0;
+    let promedioSistolica = 0, promedioDiastolica = 0;
+    let minimoSistolica = 0, maximoSistolica = 0;
+    let minimoDiastolica = 0, maximoDiastolica = 0;
 
     if (mediciones.length > 0) {
       const sistolicas = mediciones.map(m => parseFloat(m.sistolica));
@@ -531,16 +504,8 @@ router.get('/presion/historial', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[PRESION HISTORIAL] Error:', {
-      message: err.message,
-      code: err.code,
-      sqlState: err.sqlState,
-      sql: err.sql
-    });
-    return res.status(500).json({ 
-      error: true, 
-      mensaje: 'Error al obtener historial: ' + err.message 
-    });
+    console.error('[PRESION HISTORIAL] Error:', err.message);
+    return res.status(500).json({ error: true, mensaje: 'Error al obtener historial: ' + err.message });
   } finally {
     if (connection) {
       try { connection.release(); } catch (e) {}
