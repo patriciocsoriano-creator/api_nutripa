@@ -559,7 +559,6 @@ router.get('/datos-antropometricos', verificarToken, verificarRol('paciente'), a
 });
 
 
-
 // ============================================================================
 //  PUT /nutricionapp-api/paciente/plan/confirmar-cita/:citaId
 //  Confirmar asistencia a una cita
@@ -577,11 +576,13 @@ router.put('/confirmar-cita/:citaId', async (req, res) => {
       return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
     }
 
-    // Verificar que la cita pertenece al paciente
+    // Verificar que la cita pertenece al paciente Y obtener el medico_id
     const [citas] = await connection.execute(
-      `SELECT id, estado, fecha_hora 
-       FROM seguimiento_citas 
-       WHERE id = ? AND paciente_id = ?`,
+      `SELECT sc.id, sc.estado, sc.fecha_hora, sc.medico_id,
+              CONCAT(u.nombre, ' ', u.apellido) AS nombre_medico
+       FROM seguimiento_citas sc
+       INNER JOIN usuarios u ON u.id = sc.medico_id
+       WHERE sc.id = ? AND sc.paciente_id = ?`,
       [citaId, pacienteId]
     );
 
@@ -608,7 +609,37 @@ router.put('/confirmar-cita/:citaId', async (req, res) => {
       [citaId]
     );
 
-    console.log(` [CITA] Cita ${citaId} confirmada por paciente ${pacienteId}`);
+    console.log(`[CITA] Cita ${citaId} confirmada por paciente ${pacienteId}`);
+
+    // ========================================
+    // CREAR NOTIFICACION PARA EL MEDICO
+    // ========================================
+    try {
+      const fechaCita = new Date(cita.fecha_hora).toLocaleDateString('es-EC', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      await connection.execute(
+        `INSERT INTO notificaciones (medico_id, paciente_id, tipo, titulo, mensaje, cita_id)
+         VALUES (?, ?, 'confirmacion_cita', ?, ?, ?)`,
+        [
+          cita.medico_id,
+          pacienteId,
+          'Paciente confirmo su cita',
+          'Un paciente ha confirmado su cita para el ' + fechaCita,
+          citaId
+        ]
+      );
+      
+      console.log(`[CITA] Notificacion creada para medico ${cita.medico_id}`);
+    } catch (notifError) {
+      console.error('[CITA] Error creando notificacion (pero cita confirmada):', notifError.message);
+      // No fallar si la notificacion falla, la cita ya fue confirmada
+    }
 
     return res.status(200).json({
       error: false,
@@ -621,7 +652,7 @@ router.put('/confirmar-cita/:citaId', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(' [CITA] Error confirmando cita:', err);
+    console.error('[CITA] Error confirmando cita:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al confirmar la cita' 
@@ -650,11 +681,11 @@ router.put('/cancelar-cita/:citaId', async (req, res) => {
       return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
     }
 
-    // Verificar que la cita pertenece al paciente
+    // Verificar que la cita pertenece al paciente Y obtener el medico_id
     const [citas] = await connection.execute(
-      `SELECT id, estado, fecha_hora 
-       FROM seguimiento_citas 
-       WHERE id = ? AND paciente_id = ?`,
+      `SELECT sc.id, sc.estado, sc.fecha_hora, sc.medico_id
+       FROM seguimiento_citas sc
+       WHERE sc.id = ? AND sc.paciente_id = ?`,
       [citaId, pacienteId]
     );
 
@@ -681,7 +712,34 @@ router.put('/cancelar-cita/:citaId', async (req, res) => {
       [citaId]
     );
 
-    console.log(` [CITA] Cita ${citaId} cancelada por paciente ${pacienteId}`);
+    console.log(`[CITA] Cita ${citaId} cancelada por paciente ${pacienteId}`);
+
+    // ========================================
+    // CREAR NOTIFICACION PARA EL MEDICO
+    // ========================================
+    try {
+      const fechaCita = new Date(cita.fecha_hora).toLocaleDateString('es-EC', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+      });
+      
+      await connection.execute(
+        `INSERT INTO notificaciones (medico_id, paciente_id, tipo, titulo, mensaje, cita_id)
+         VALUES (?, ?, 'cancelacion_cita', ?, ?, ?)`,
+        [
+          cita.medico_id,
+          pacienteId,
+          'Paciente cancelo su cita',
+          'Un paciente ha cancelado su cita programada para el ' + fechaCita,
+          citaId
+        ]
+      );
+      
+      console.log(`[CITA] Notificacion de cancelacion creada para medico ${cita.medico_id}`);
+    } catch (notifError) {
+      console.error('[CITA] Error creando notificacion de cancelacion:', notifError.message);
+    }
 
     return res.status(200).json({
       error: false,
@@ -689,7 +747,7 @@ router.put('/cancelar-cita/:citaId', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(' [CITA] Error cancelando cita:', err);
+    console.error('[CITA] Error cancelando cita:', err);
     return res.status(500).json({ 
       error: true, 
       mensaje: 'Error al cancelar la cita' 
