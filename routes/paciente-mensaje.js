@@ -1,16 +1,67 @@
+// routes/paciente-mensaje.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../conexion').pool;
+const { getConnection } = require('../conexion');
 const { verificarToken } = require('../middleware/auth');
+
+// ========================================
+// HELPER: Obtener paciente_id real del usuario
+// ========================================
+async function obtenerPacienteId(usuarioId, connection) {
+  const [paciente] = await connection.execute(
+    'SELECT id FROM pacientes WHERE usuario_id = ? AND eliminado_en IS NULL AND activo = 1',
+    [usuarioId]
+  );
+  
+  if (paciente.length === 0) {
+    // Si no tiene paciente vinculado, buscar por cédula
+    const [usuario] = await connection.execute(
+      'SELECT cedula FROM usuarios WHERE id = ?',
+      [usuarioId]
+    );
+    
+    if (usuario.length > 0 && usuario[0].cedula) {
+      const [pacienteByCedula] = await connection.execute(
+        'SELECT id FROM pacientes WHERE numero_identificacion = ? AND eliminado_en IS NULL',
+        [usuario[0].cedula]
+      );
+      
+      if (pacienteByCedula.length > 0) {
+        return pacienteByCedula[0].id;
+      }
+    }
+    return null;
+  }
+  
+  return paciente[0].id;
+}
 
 // ========================================
 // OBTENER CONVERSACION CON EL MEDICO ASIGNADO
 // ========================================
 router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
+  const usuarioId = req.usuario.id;
+  let connection;
+  
   try {
-    const pacienteId = req.usuario.id;
+    connection = await getConnection();
+    
+    // Obtener el paciente_id real del usuario
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.json({
+        error: false,
+        conversaciones: [],
+        sinMedico: true,
+        mensaje: 'No tienes un perfil de paciente asociado'
+      });
+    }
+    
+    console.log('[MENSAJES PACIENTE] Buscando medico para paciente:', pacienteId);
 
-    const [medicoRows] = await pool.query(`
+    const [medicoRows] = await connection.execute(`
       SELECT 
         m.id AS medico_id,
         CONCAT(m.nombre, ' ', m.apellido) AS nombre_medico,
@@ -33,7 +84,7 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
 
     const medico = medicoRows[0];
 
-    const [mensajeRows] = await pool.query(`
+    const [mensajeRows] = await connection.execute(`
       SELECT 
         contenido AS ultimo_mensaje,
         fecha AS ultimo_mensaje_fecha,
@@ -44,7 +95,7 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
       LIMIT 1
     `, [medico.medico_id, pacienteId]);
 
-    const [noLeidosRows] = await pool.query(`
+    const [noLeidosRows] = await connection.execute(`
       SELECT COUNT(*) AS total
       FROM mensajes
       WHERE medico_id = ? AND paciente_id = ? AND es_medico = 1 AND leido = 0
@@ -60,6 +111,8 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
       en_linea: false
     };
 
+    console.log('[MENSAJES PACIENTE] Medico encontrado:', medico.nombre_medico);
+
     res.json({
       error: false,
       conversaciones: [conversacion],
@@ -67,11 +120,20 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[ERROR CONVERSACION PACIENTE]', error);
+    console.error('[ERROR CONVERSACION PACIENTE]', {
+      message: error.message,
+      code: error.code,
+      sqlState: error.sqlState
+    });
     res.status(500).json({
       error: true,
-      mensaje: 'Error al obtener conversacion'
+      mensaje: 'Error al obtener conversacion',
+      detalle: error.message
     });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
   }
 });
 
@@ -79,11 +141,19 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
 // OBTENER MENSAJES DE LA CONVERSACION
 // ========================================
 router.get('/mensajes/conversacion/:medicoId', verificarToken, async (req, res) => {
+  const usuarioId = req.usuario.id;
+  const medicoId = req.params.medicoId;
+  let connection;
+  
   try {
-    const pacienteId = req.usuario.id;
-    const medicoId = req.params.medicoId;
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
 
-    const [rows] = await pool.query(`
+    const [rows] = await connection.execute(`
       SELECT 
         id,
         contenido,
@@ -106,6 +176,10 @@ router.get('/mensajes/conversacion/:medicoId', verificarToken, async (req, res) 
       error: true,
       mensaje: 'Error al obtener mensajes'
     });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
   }
 });
 
@@ -113,9 +187,17 @@ router.get('/mensajes/conversacion/:medicoId', verificarToken, async (req, res) 
 // ENVIAR MENSAJE AL MEDICO
 // ========================================
 router.post('/mensajes/enviar', verificarToken, async (req, res) => {
+  const usuarioId = req.usuario.id;
+  const { medico_id, contenido } = req.body;
+  let connection;
+  
   try {
-    const pacienteId = req.usuario.id;
-    const { medico_id, contenido } = req.body;
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
 
     if (!medico_id || !contenido || !contenido.trim()) {
       return res.status(400).json({
@@ -124,7 +206,7 @@ router.post('/mensajes/enviar', verificarToken, async (req, res) => {
       });
     }
 
-    const [asignacionRows] = await pool.query(`
+    const [asignacionRows] = await connection.execute(`
       SELECT id FROM asignaciones
       WHERE medico_id = ? AND paciente_id = ? AND estado = 'activo'
       LIMIT 1
@@ -137,7 +219,7 @@ router.post('/mensajes/enviar', verificarToken, async (req, res) => {
       });
     }
 
-    const [result] = await pool.query(`
+    const [result] = await connection.execute(`
       INSERT INTO mensajes (medico_id, paciente_id, contenido, es_medico, leido)
       VALUES (?, ?, ?, 0, 0)
     `, [medico_id, pacienteId, contenido.trim()]);
@@ -152,8 +234,13 @@ router.post('/mensajes/enviar', verificarToken, async (req, res) => {
     console.error('[ERROR ENVIAR PACIENTE]', error);
     res.status(500).json({
       error: true,
-      mensaje: 'Error al enviar mensaje'
+      mensaje: 'Error al enviar mensaje',
+      detalle: error.message
     });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
   }
 });
 
@@ -161,11 +248,19 @@ router.post('/mensajes/enviar', verificarToken, async (req, res) => {
 // MARCAR MENSAJES COMO LEIDOS
 // ========================================
 router.put('/mensajes/leidos/:medicoId', verificarToken, async (req, res) => {
+  const usuarioId = req.usuario.id;
+  const medicoId = req.params.medicoId;
+  let connection;
+  
   try {
-    const pacienteId = req.usuario.id;
-    const medicoId = req.params.medicoId;
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.status(404).json({ error: true, mensaje: 'Paciente no encontrado' });
+    }
 
-    await pool.query(`
+    await connection.execute(`
       UPDATE mensajes
       SET leido = 1
       WHERE medico_id = ? AND paciente_id = ? AND es_medico = 1 AND leido = 0
@@ -182,6 +277,10 @@ router.put('/mensajes/leidos/:medicoId', verificarToken, async (req, res) => {
       error: true,
       mensaje: 'Error al marcar como leidos'
     });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
   }
 });
 
@@ -189,10 +288,18 @@ router.put('/mensajes/leidos/:medicoId', verificarToken, async (req, res) => {
 // CONTADOR DE MENSAJES NO LEIDOS
 // ========================================
 router.get('/mensajes/no-leidos', verificarToken, async (req, res) => {
+  const usuarioId = req.usuario.id;
+  let connection;
+  
   try {
-    const pacienteId = req.usuario.id;
+    connection = await getConnection();
+    const pacienteId = await obtenerPacienteId(usuarioId, connection);
+    
+    if (!pacienteId) {
+      return res.json({ error: false, total: 0 });
+    }
 
-    const [rows] = await pool.query(`
+    const [rows] = await connection.execute(`
       SELECT COUNT(*) AS total
       FROM mensajes m
       INNER JOIN asignaciones a ON m.medico_id = a.medico_id AND m.paciente_id = a.paciente_id
@@ -210,6 +317,10 @@ router.get('/mensajes/no-leidos', verificarToken, async (req, res) => {
       error: true,
       mensaje: 'Error al obtener mensajes no leidos'
     });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
   }
 });
 
