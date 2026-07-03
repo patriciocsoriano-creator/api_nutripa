@@ -386,5 +386,87 @@ router.get('/:pacienteId/presion', verificarToken, verificarRol('medico', 'nutri
   }
 });
 
+// ============================================================================
+//  GET /nutricionapp-api/medico/paciente/:pacienteId/registro-actual
+//  Obtener el registro clínico más reciente del paciente
+// ============================================================================
+router.get('/:pacienteId/registro-actual', verificarToken, async (req, res) => {
+  const { pacienteId } = req.params;
+  
+  console.log('[MEDICO] Consultando registro actual para paciente:', pacienteId);
+
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // Obtener el registro más reciente finalizado
+    const [registros] = await connection.execute(
+      `SELECT 
+        r.id,
+        r.paciente_id,
+        r.registrado_por,
+        r.estado,
+        r.datos_personales,
+        r.signos_vitales,
+        r.datos_antropometricos,
+        r.condiciones_metabolicas,
+        r.fecha_inicio,
+        r.fecha_finalizacion,
+        r.observaciones,
+        r.creado_en,
+        u.nombre as registrado_por_nombre,
+        u.apellido as registrado_por_apellido
+       FROM registro r
+       LEFT JOIN usuarios u ON u.id = r.registrado_por
+       WHERE r.paciente_id = ? AND r.estado = 'finalizado'
+       ORDER BY r.fecha_finalizacion DESC
+       LIMIT 1`,
+      [pacienteId]
+    );
+
+    if (registros.length === 0) {
+      return res.json({ 
+        error: false, 
+        registro: null,
+        mensaje: 'No hay registros finalizados para este paciente'
+      });
+    }
+
+    const registro = registros[0];
+
+    // Parsear campos JSON
+    const camposJson = ['datos_personales', 'signos_vitales', 'datos_antropometricos', 'condiciones_metabolicas'];
+    
+    for (const campo of camposJson) {
+      if (registro[campo] && typeof registro[campo] === 'string') {
+        try {
+          registro[campo] = JSON.parse(registro[campo]);
+        } catch (e) {
+          console.warn(`[MEDICO] Error parseando ${campo}:`, e.message);
+          registro[campo] = null;
+        }
+      }
+    }
+
+    console.log(`[MEDICO] Registro actual ${registro.id} consultado exitosamente`);
+
+    return res.status(200).json({
+      error: false,
+      registro
+    });
+
+  } catch (err) {
+    console.error('[MEDICO] Error:', err);
+    return res.status(500).json({ 
+      error: true, 
+      mensaje: 'Error al obtener registro actual: ' + err.message
+    });
+  } finally {
+    if (connection) {
+      try { connection.release(); } catch (e) {}
+    }
+  }
+});
+
 console.log(' [ROUTER] medico-paciente-detalle.js cargado correctamente');
 module.exports = router;
