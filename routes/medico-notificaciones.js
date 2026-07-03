@@ -14,6 +14,9 @@ router.get('/notificaciones', verificarToken, async (req, res) => {
   try {
     connection = await getConnection();
     
+    console.log('[NOTIFICACIONES] Buscando para medico:', medicoId);
+    
+    // JOIN CORREGIDO: notificaciones -> pacientes -> usuarios
     const [notificaciones] = await connection.execute(
       `SELECT 
          n.id,
@@ -23,10 +26,11 @@ router.get('/notificaciones', verificarToken, async (req, res) => {
          n.leida,
          n.fecha,
          n.cita_id,
-         CONCAT(u.nombre, ' ', u.apellido) AS nombre_paciente,
+         CONCAT(p.nombres, ' ', p.apellidos) AS nombre_paciente,
          u.cedula AS cedula_paciente
        FROM notificaciones n
-       INNER JOIN usuarios u ON u.id = n.paciente_id
+       INNER JOIN pacientes p ON p.id = n.paciente_id
+       LEFT JOIN usuarios u ON u.id = p.usuario_id
        WHERE n.medico_id = ?
        ORDER BY n.fecha DESC
        LIMIT 50`,
@@ -39,6 +43,8 @@ router.get('/notificaciones', verificarToken, async (req, res) => {
        WHERE medico_id = ? AND leida = 0`,
       [medicoId]
     );
+    
+    console.log('[NOTIFICACIONES] Encontradas:', notificaciones.length, 'No leidas:', noLeidas[0].total);
     
     res.json({
       error: false,
