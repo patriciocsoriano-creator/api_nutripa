@@ -16,7 +16,8 @@ app.use(cors({
     'http://localhost:4200',
     'capacitor://localhost',
     'http://localhost',
-    'http://app.72.61.11.127.nip.io'
+    'http://app.72.61.11.127.nip.io',
+    'https://nutriapp.serverteced.cloud'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
