@@ -47,10 +47,24 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
   try {
     connection = await getConnection();
     
+    console.log('[MENSAJES] ========================================');
+    console.log('[MENSAJES] Usuario ID del token:', usuarioId);
+    
     // Obtener el paciente_id real del usuario
     const pacienteId = await obtenerPacienteId(usuarioId, connection);
     
+    console.log('[MENSAJES] Paciente ID encontrado:', pacienteId);
+    
     if (!pacienteId) {
+      console.warn('[MENSAJES] No se encontro paciente para usuario:', usuarioId);
+      
+      // Debug: verificar si existe el paciente
+      const [pacienteCheck] = await connection.execute(
+        'SELECT id, nombres, apellidos, usuario_id FROM pacientes WHERE usuario_id = ?',
+        [usuarioId]
+      );
+      console.log('[MENSAJES] Debug - Pacientes con este usuario_id:', pacienteCheck);
+      
       return res.json({
         error: false,
         conversaciones: [],
@@ -59,7 +73,7 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
       });
     }
     
-    console.log('[MENSAJES PACIENTE] Buscando medico para paciente:', pacienteId);
+    console.log('[MENSAJES] Buscando medico para paciente:', pacienteId);
 
     const [medicoRows] = await connection.execute(`
       SELECT 
@@ -73,7 +87,19 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
       LIMIT 1
     `, [pacienteId]);
 
+    console.log('[MENSAJES] Medicos encontrados:', medicoRows.length);
+    console.log('[MENSAJES] Resultado:', medicoRows);
+
     if (medicoRows.length === 0) {
+      console.warn('[MENSAJES] No hay medico asignado para paciente:', pacienteId);
+      
+      // Debug: verificar asignaciones
+      const [asignacionesCheck] = await connection.execute(
+        'SELECT * FROM asignaciones WHERE paciente_id = ?',
+        [pacienteId]
+      );
+      console.log('[MENSAJES] Debug - Asignaciones para este paciente:', asignacionesCheck);
+      
       return res.json({
         error: false,
         conversaciones: [],
@@ -83,6 +109,7 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
     }
 
     const medico = medicoRows[0];
+    console.log('[MENSAJES] Medico encontrado:', medico.nombre_medico);
 
     const [mensajeRows] = await connection.execute(`
       SELECT 
@@ -111,7 +138,8 @@ router.get('/mensajes/conversacion', verificarToken, async (req, res) => {
       en_linea: false
     };
 
-    console.log('[MENSAJES PACIENTE] Medico encontrado:', medico.nombre_medico);
+    console.log('[MENSAJES] Conversacion construida exitosamente');
+    console.log('[MENSAJES] ========================================');
 
     res.json({
       error: false,
