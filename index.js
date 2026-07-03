@@ -40,7 +40,7 @@ app.use('/nutricionapp-api/medico/plan-nutricional', require('./routes/medico-pl
 app.use('/nutricionapp-api/medico/seguimiento', require('./routes/medico-seguimiento-clinico'));
 app.use('/nutricionapp-api/medico/informes', require('./routes/medicoinformes'));
 app.use('/nutricionapp-api/medico/perfil', require('./routes/medico-perfil'));
-
+app.use('/nutricionapp-api/medico', require('./routes/medico-mensajes')); 
 // ========================================
 // APIs EXTERNAS
 // ========================================
@@ -52,6 +52,7 @@ app.use('/nutricionapp-api/fatsecret', require('./routes/fatsecret'));
 app.use('/nutricionapp-api/paciente/vincular', require('./routes/pacientevincular'));
 app.use('/nutricionapp-api/paciente/plan', require('./routes/paciente-plan'));
 app.use('/nutricionapp-api/paciente/glucosa', require('./routes/paciente-glucosa'));
+app.use('/nutricionapp-api/paciente', require('./routes/paciente-mensaje'));
 
 // ========================================
 // ADMINISTRADOR (ORDEN CRITICO)
