@@ -126,17 +126,22 @@ const verificarToken = async (req, res, next) => {
 // ========================================
 const verificarRol = (...rolesPermitidos) => {
   return (req, res, next) => {
-    console.log('[ROL] Verificando acceso. Rol del usuario:', req.usuario?.rol);
-    
+
+    console.log("========== VERIFICAR ROL ==========");
+    console.log("req.usuario =", req.usuario);
+    console.log("rol =", req.usuario?.rol);
+    console.log("permitidos =", rolesPermitidos);
+
     if (!req.usuario || !rolesPermitidos.includes(req.usuario.rol)) {
-      console.warn('[ROL] Acceso denegado. Usuario tiene rol:', req.usuario?.rol);
-      return res.status(403).json({ 
-        error: true, 
-        mensaje: 'Acceso denegado: rol no autorizado' 
+      console.log("DENEGADO");
+
+      return res.status(403).json({
+        error: true,
+        mensaje: "Acceso denegado: rol no autorizado"
       });
     }
-    
-    console.log('[ROL] Acceso concedido');
+
+    console.log("PERMITIDO");
     next();
   };
 };
