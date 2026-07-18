@@ -36,7 +36,7 @@ app.use('/nutricionapp-api/enfermeria', require('./routes/enfermeriaeditarperfil
 app.use('/nutricionapp-api/medico/dashboard', require('./routes/medico-dashboard'));
 app.use('/nutricionapp-api/medico/paciente', require('./routes/medico-paciente-detalle'));
 app.use('/nutricionapp-api/medico/pacientes', require('./routes/verpacientes'));
-app.use('/nutricionapp-api/medico/configuracion', require('./routes/medico-configuracion-nutricional.routes'));
+app.use('/nutricionapp-api/medico/configuracion', require('./routes/medico-configuracion-nutricional'));
 app.use('/nutricionapp-api/medico/plan-nutricional', require('./routes/medico-plan-nutricional'));
 app.use('/nutricionapp-api/medico/seguimiento', require('./routes/medico-seguimiento-clinico'));
 app.use('/nutricionapp-api/medico/informes', require('./routes/medicoinformes'));
