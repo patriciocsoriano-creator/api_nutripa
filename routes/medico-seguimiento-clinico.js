@@ -622,5 +622,5 @@ router.get('/dashboard/:paciente_id', verificarRol('doctor', 'nutricionista'), a
   }
 });
 
-console.log('✅ [ROUTER] medico-seguimiento-clinico.js cargado correctamente');
+console.log(' [ROUTER] medico-seguimiento-clinico.js cargado correctamente');
 module.exports = router;

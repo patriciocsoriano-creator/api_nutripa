@@ -36,7 +36,7 @@ transporter.verify()
     });
 
 // ============================================
-// 📧 ENVIAR CÓDIGO DE RECUPERACIÓN
+//  ENVIAR CÓDIGO DE RECUPERACIÓN
 // ============================================
 async function sendRecoveryEmail(correo, nombre, codigo) {
     const html = `

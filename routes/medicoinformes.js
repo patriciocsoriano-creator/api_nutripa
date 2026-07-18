@@ -523,5 +523,5 @@ router.get('/registros', async (req, res) => {
   }
 });
 
-console.log('✅ [ROUTER] medicoinformes.js cargado correctamente');
+console.log(' [ROUTER] medicoinformes.js cargado correctamente');
 module.exports = router;
