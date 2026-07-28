@@ -5,6 +5,9 @@ const bcrypt = require('bcrypt');
 const { getConnection } = require('../conexion');
 const { v4: uuidv4 } = require('uuid');
 
+const axios = require('axios');
+const cheerio = require('cheerio');
+
 //  Función para validar cédula ecuatoriana
 const validarCedulaEcuador = (cedula) => {
     if (!/^\d{10}$/.test(cedula)) return false;
@@ -30,6 +33,113 @@ const validarCedulaEcuador = (cedula) => {
     const digitoVerificador = (10 - (suma % 10)) % 10;
     return digitoVerificador === digitos[9];
 };
+
+
+// ============================================================================
+//  FUNCIÓN HELPER: Verificar título en ACESS (Reutilizable)
+// ============================================================================
+async function verificarTituloAcces(cedula) {
+    try {
+        const response = await axios.get(
+            `https://saccs.acess.gob.ec/publico/talentohumano/consultareg/titulosreg/${cedula}`,
+            {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0'
+                }
+            }
+        );
+
+        const $ = cheerio.load(response.data);
+
+        // Obtener nombre completo
+        const nombre = $('p label').eq(1).text().trim();
+
+        // Obtener filas de la tabla
+        const filas = $('#datatable tbody tr');
+
+        if (filas.length === 0) {
+            return {
+                valido: false,
+                mensaje: 'La persona no registra títulos en ACESS.'
+            };
+        }
+
+        let tituloEncontrado = null;
+
+        filas.each((i, fila) => {
+            const columnas = $(fila).find('td');
+
+            const titulo = $(columnas[0]).text().trim();
+            const universidad = $(columnas[2]).text().trim();
+            const fechaRegistro = $(columnas[4]).text().trim();
+
+            const texto = titulo.toUpperCase();
+
+            if (
+                texto.includes('NUTRICION') ||
+                texto.includes('NUTRICIÓN') ||
+                texto.includes('DIETISTA') ||
+                texto.includes('DIETETICA') ||
+                texto.includes('DIETÉTICA')
+            ) {
+                tituloEncontrado = {
+                    titulo,
+                    universidad,
+                    fecha_registro: fechaRegistro
+                };
+
+                return false; // salir del each
+            }
+        });
+
+        if (!tituloEncontrado) {
+            return {
+                valido: false,
+                mensaje: 'La persona no posee un título registrado de Nutrición o Dietética.'
+            };
+        }
+
+        return {
+            valido: true,
+            datos: {
+                nombre,
+                titulo: tituloEncontrado.titulo,
+                universidad: tituloEncontrado.universidad,
+                fecha_registro: tituloEncontrado.fecha_registro
+            }
+        };
+
+    } catch (error) {
+        console.error("Error consultando ACESS:", error);
+
+        return {
+            valido: false,
+            mensaje: 'No fue posible consultar ACESS.'
+        };
+    }
+}
+// ============================================================================
+//  GET /nutricionapp-api/registro/verificar-titulo
+//  ENDPOINT PARA QUE EL FRONTEND VERIFIQUE EN TIEMPO REAL
+// ============================================================================
+router.get('/verificar-titulo', async (req, res) => {
+    const { cedula } = req.query;
+
+    if (!cedula || cedula.length !== 10) {
+        return res.status(400).json({ error: true, mensaje: 'Cédula inválida' });
+    }
+
+    const resultado = await verificarTituloAcces(cedula);
+
+    if (resultado.valido) {
+        return res.status(200).json({ error: false, ...resultado });
+    } else {
+        return res.status(404).json({ error: true, mensaje: resultado.mensaje });
+    }
+});
+
+
+
 
 // ============================================================================
 //  GET /nutricionapp-api/registro/buscar-paciente
@@ -194,8 +304,19 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: true, mensaje: 'Debe aceptar los términos y condiciones' });
     }
 
-    if (password.length < 6) {
-        return res.status(400).json({ error: true, mensaje: 'La contraseña debe tener al menos 6 caracteres' });
+    if (password.length < 8) { // Actualizado a 8 por buenas prácticas de seguridad
+        return res.status(400).json({ error: true, mensaje: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    //  NUEVO: Validación de seguridad en Backend para Nutricionistas
+    if (rol.toLowerCase() === 'nutricionista') {
+        const verificacionAcces = await verificarTituloAcces(cedula);
+        if (!verificacionAcces.valido) {
+            return res.status(400).json({ 
+                error: true, 
+                mensaje: `Validación de título fallida: ${verificacionAcces.mensaje}` 
+            });
+        }
     }
 
     if (!validarCedulaEcuador(cedula)) {
@@ -230,7 +351,6 @@ router.post('/', async (req, res) => {
         if (existeCedula.length > 0) {
             const usuarioExistente = existeCedula[0];
             
-            //  Si la cédula ya existe con el MISMO rol que intenta registrar
             if (usuarioExistente.rol_nombre === rol.toLowerCase()) {
                 return res.status(409).json({ 
                     error: true, 
@@ -238,10 +358,9 @@ router.post('/', async (req, res) => {
                 });
             }
             
-            //  Si la cédula ya existe con OTRO rol
             return res.status(409).json({ 
                 error: true, 
-                mensaje: `La cédula ya está registrada como <strong>${usuarioExistente.rol_nombre}</strong>. No puede registrarse con otro rol usando la misma cédula. Contacte al administrador.` 
+                mensaje: `La cédula ya está registrada como <strong>${usuarioExistente.rol_nombre}</strong>. No puede registrarse con otro rol usando la misma cédula.` 
             });
         }
 
@@ -285,22 +404,14 @@ router.post('/', async (req, res) => {
         // Si es paciente, vincular con paciente existente o crear nuevo
         if (rol.toLowerCase() === 'paciente') {
             if (vincularPaciente && pacienteExistenteId) {
-                //  VINCULAR paciente existente al nuevo usuario
                 const [updateResult] = await connection.execute(
-                    `UPDATE pacientes 
-                     SET usuario_id = ?, 
-                         actualizado_en = NOW()
-                     WHERE id = ?`,
+                    `UPDATE pacientes SET usuario_id = ?, actualizado_en = NOW() WHERE id = ?`,
                     [usuarioId, pacienteExistenteId]
                 );
-                
                 if (updateResult.affectedRows > 0) {
                     console.log(` Paciente ${pacienteExistenteId} vinculado al usuario ${usuarioId}`);
-                } else {
-                    console.warn(` No se pudo vincular paciente ${pacienteExistenteId}`);
                 }
             } else {
-                // CREAR nuevo paciente
                 const nuevoPacienteId = uuidv4();
                 await connection.execute(
                     `INSERT INTO pacientes (
