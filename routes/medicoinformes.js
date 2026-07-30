@@ -473,12 +473,16 @@ console.log("=================================");
 
     // Registros finalizados
     const [finalizadosResult] = await connection.execute(
-      `SELECT COUNT(*) as total,
-        AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_finalizacion)) as tiempo_promedio
-       FROM registro 
-       WHERE registrado_por = ? AND estado = 'finalizado'`,
-      [medicoId]
-    );
+  `SELECT 
+      COUNT(*) as total,
+      AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_finalizacion)) as tiempo_promedio
+   FROM registro r
+   INNER JOIN pacientes p ON p.id = r.paciente_id
+   INNER JOIN asignaciones a ON a.paciente_id = p.id
+   WHERE a.usuario_id = ?
+   AND r.estado = 'finalizado'`,
+  [medicoId]
+);
 
     //  Registros en proceso (no finalizados ni cancelados)
     const [enProcesoResult] = await connection.execute(
