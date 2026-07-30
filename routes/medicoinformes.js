@@ -461,80 +461,142 @@ router.get('/alertas', async (req, res) => {
 
 router.get('/registros', async (req, res) => {
   const medicoId = req.usuario?.id;
-  console.log("=================================");
-console.log("Usuario del token:");
-console.log(req.usuario);
-console.log("medicoId:", medicoId);
-console.log("=================================");
   let connection;
 
   try {
     connection = await getConnection();
 
-    // Registros finalizados
+    console.log('========== INFORMES REGISTROS ==========');
+    console.log('Medico ID:', medicoId);
+
+
+    // FINALIZADOS
     const [finalizadosResult] = await connection.execute(
-  `SELECT 
-      COUNT(*) as total,
-      AVG(TIMESTAMPDIFF(MINUTE, fecha_inicio, fecha_finalizacion)) as tiempo_promedio
-   FROM registro r
-   INNER JOIN pacientes p ON p.id = r.paciente_id
-   INNER JOIN asignaciones a ON a.paciente_id = p.id
-   WHERE a.usuario_id = ?
-   AND r.estado = 'finalizado'`,
-  [medicoId]
-);
+      `
+      SELECT 
+          COUNT(*) AS total,
+          AVG(
+            TIMESTAMPDIFF(
+              MINUTE,
+              r.fecha_inicio,
+              r.fecha_finalizacion
+            )
+          ) AS tiempo_promedio
+      FROM registro r
+      INNER JOIN asignaciones a
+          ON a.paciente_id = r.paciente_id
+      WHERE a.medico_id = ?
+      AND r.estado = 'finalizado'
+      `,
+      [medicoId]
+    );
 
-    //  Registros en proceso (no finalizados ni cancelados)
+
+    // EN PROCESO
     const [enProcesoResult] = await connection.execute(
-  `SELECT COUNT(*) as total 
-   FROM registro r
-   INNER JOIN pacientes p ON p.id = r.paciente_id
-   INNER JOIN asignaciones a ON a.paciente_id = p.id
-   WHERE a.usuario_id = ?
-   AND r.estado NOT IN ('finalizado','cancelado')`,
-  [medicoId]
-);
+      `
+      SELECT COUNT(*) AS total
+      FROM registro r
+      INNER JOIN asignaciones a
+          ON a.paciente_id = r.paciente_id
+      WHERE a.medico_id = ?
+      AND r.estado IN (
+          'iniciado',
+          'datos_personales',
+          'signos_vitales',
+          'antropometricos',
+          'metabolicas'
+      )
+      `,
+      [medicoId]
+    );
 
-    //  Registros cancelados
+
+    // CANCELADOS
     const [canceladosResult] = await connection.execute(
-  `SELECT COUNT(*) as total 
-   FROM registro r
-   INNER JOIN pacientes p ON p.id = r.paciente_id
-   INNER JOIN asignaciones a ON a.paciente_id = p.id
-   WHERE a.usuario_id = ?
-   AND r.estado = 'cancelado'`,
-  [medicoId]
-);
+      `
+      SELECT COUNT(*) AS total
+      FROM registro r
+      INNER JOIN asignaciones a
+          ON a.paciente_id = r.paciente_id
+      WHERE a.medico_id = ?
+      AND r.estado = 'cancelado'
+      `,
+      [medicoId]
+    );
 
-    const total = (finalizadosResult[0]?.total || 0) + 
-                  (enProcesoResult[0]?.total || 0) + 
-                  (canceladosResult[0]?.total || 0);
 
-    const tasaCancelacion = total > 0 
-      ? (canceladosResult[0]?.total / total * 100) 
-      : 0;
+    const finalizados =
+      Number(finalizadosResult[0]?.total || 0);
 
-    const eficiencia = total > 0 
-      ? (finalizadosResult[0]?.total / total * 100) 
-      : 0;
+    const proceso =
+      Number(enProcesoResult[0]?.total || 0);
 
-    return res.status(200).json({
-      error: false,
-      informes: {
-        finalizados: finalizadosResult[0]?.total || 0,
-        enProceso: enProcesoResult[0]?.total || 0,
-        cancelados: canceladosResult[0]?.total || 0,
-        tiempoPromedio: Math.round(finalizadosResult[0]?.tiempo_promedio || 0),
-        tasaCancelacion: parseFloat(tasaCancelacion.toFixed(1)),
-        eficiencia: parseFloat(eficiencia.toFixed(1))
+    const cancelados =
+      Number(canceladosResult[0]?.total || 0);
+
+
+    const total =
+      finalizados + proceso + cancelados;
+
+
+    const tasaCancelacion =
+      total > 0
+        ? (cancelados / total) * 100
+        : 0;
+
+
+    const eficiencia =
+      total > 0
+        ? (finalizados / total) * 100
+        : 0;
+
+
+    console.log({
+      finalizados,
+      proceso,
+      cancelados,
+      total
+    });
+
+
+    return res.json({
+      error:false,
+      informes:{
+        finalizados,
+        enProceso:proceso,
+        cancelados,
+        tiempoPromedio:
+          Math.round(
+            finalizadosResult[0]?.tiempo_promedio || 0
+          ),
+        tasaCancelacion:
+          Number(tasaCancelacion.toFixed(1)),
+        eficiencia:
+          Number(eficiencia.toFixed(1))
       }
     });
 
-  } catch (err) {
-    console.error(' [INFORMES] Error en informes/registros:', err);
-    return res.status(500).json({ error: true, mensaje: 'Error al obtener informes de registros' });
+
+  } catch(error){
+
+    console.error(
+      'ERROR INFORMES REGISTROS:',
+      error.message
+    );
+
+    return res.status(500).json({
+      error:true,
+      mensaje:error.message
+    });
+
+
   } finally {
-    if (connection) try { connection.release(); } catch (e) {}
+
+    if(connection){
+      connection.release();
+    }
+
   }
 });
 
