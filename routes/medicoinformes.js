@@ -486,20 +486,25 @@ console.log("=================================");
 
     //  Registros en proceso (no finalizados ni cancelados)
     const [enProcesoResult] = await connection.execute(
-      `SELECT COUNT(*) as total 
-       FROM registro 
-       WHERE registrado_por = ? 
-         AND estado NOT IN ('finalizado', 'cancelado')`,
-      [medicoId]
-    );
+  `SELECT COUNT(*) as total 
+   FROM registro r
+   INNER JOIN pacientes p ON p.id = r.paciente_id
+   INNER JOIN asignaciones a ON a.paciente_id = p.id
+   WHERE a.usuario_id = ?
+   AND r.estado NOT IN ('finalizado','cancelado')`,
+  [medicoId]
+);
 
     //  Registros cancelados
     const [canceladosResult] = await connection.execute(
-      `SELECT COUNT(*) as total 
-       FROM registro 
-       WHERE registrado_por = ? AND estado = 'cancelado'`,
-      [medicoId]
-    );
+  `SELECT COUNT(*) as total 
+   FROM registro r
+   INNER JOIN pacientes p ON p.id = r.paciente_id
+   INNER JOIN asignaciones a ON a.paciente_id = p.id
+   WHERE a.usuario_id = ?
+   AND r.estado = 'cancelado'`,
+  [medicoId]
+);
 
     const total = (finalizadosResult[0]?.total || 0) + 
                   (enProcesoResult[0]?.total || 0) + 
