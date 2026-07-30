@@ -458,8 +458,14 @@ router.get('/alertas', async (req, res) => {
 //  INFORMES DE REGISTROS CLÍNICOS
 // GET /nutricionapp-api/medico/informes/registros
 // ============================================================================
+
 router.get('/registros', async (req, res) => {
   const medicoId = req.usuario?.id;
+  console.log("=================================");
+console.log("Usuario del token:");
+console.log(req.usuario);
+console.log("medicoId:", medicoId);
+console.log("=================================");
   let connection;
 
   try {
